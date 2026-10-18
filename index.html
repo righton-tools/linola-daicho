@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<base target="_top">
+<title>Linola 支援台帳</title>
+<link rel="manifest" href="manifest_1.json">
+<link rel="icon" type="image/png" href="favicon_1.png">
+<link rel="apple-touch-icon" href="icon-180_1.png">
+<meta name="theme-color" content="#0E6B84">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="支援台帳">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --bg:#F2F4F7; --surface:#FFFFFF; --surface2:#E9EDF2; --line:#D5DBE3;
+  --ink:#172033; --ink2:#4B5665; --muted:#7C8794;
+  --accent:#0E6B84; --accent-ink:#FFFFFF; --accent-soft:#DDEFF4;
+  --warn:#9A6700; --warn-soft:#FBEFD2; --crit:#B3261E; --crit-soft:#F9DEDC;
+  --ok:#2A6F3E; --ok-soft:#DCF0E2; --retired:#6B7280; --retired-soft:#E5E7EB;
+  --shadow:0 1px 2px rgba(23,32,51,.06),0 4px 14px rgba(23,32,51,.06);
+  --r:12px; --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --sans:"Noto Sans JP",system-ui,-apple-system,"Hiragino Sans","Yu Gothic",sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0F141B; --surface:#171E27; --surface2:#1F2833; --line:#2C3743;
+  --ink:#E8ECF1; --ink2:#B4BDC8; --muted:#7F8B98;
+  --accent:#4FB3CF; --accent-ink:#0B1A20; --accent-soft:#12303A;
+  --warn:#E8B84A; --warn-soft:#3A2E10; --crit:#F08A83; --crit-soft:#3E1A18;
+  --ok:#7CCB94; --ok-soft:#153323; --retired:#9AA3AE; --retired-soft:#2A323C;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 4px 14px rgba(0,0,0,.35);
+}}
+:root[data-theme="dark"]{
+  --bg:#0F141B; --surface:#171E27; --surface2:#1F2833; --line:#2C3743;
+  --ink:#E8ECF1; --ink2:#B4BDC8; --muted:#7F8B98;
+  --accent:#4FB3CF; --accent-ink:#0B1A20; --accent-soft:#12303A;
+  --warn:#E8B84A; --warn-soft:#3A2E10; --crit:#F08A83; --crit-soft:#3E1A18;
+  --ok:#7CCB94; --ok-soft:#153323; --retired:#9AA3AE; --retired-soft:#2A323C;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 4px 14px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.55;-webkit-text-size-adjust:100%}
+button,input,select,textarea{font:inherit;color:inherit}
+a{color:var(--accent);text-decoration:none}
+.app{max-width:720px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column}
+.top{position:sticky;top:0;z-index:5;background:var(--surface);border-bottom:1px solid var(--line);padding:10px 14px;display:flex;align-items:center;gap:10px}
+.top .back{border:0;background:var(--surface2);width:36px;height:36px;border-radius:10px;display:grid;place-items:center;cursor:pointer;flex:none}
+.top .back:disabled{visibility:hidden}
+.top h1{font-size:16px;font-weight:700;margin:0;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.top .brand{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:block;font-weight:500}
+.staff{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 11px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px;max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none}
+.dot.on{background:var(--ok)}.dot.local{background:var(--warn)}
+.ptr{position:fixed;top:10px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);font-size:12px;padding:6px 12px;border-radius:999px;opacity:0;z-index:30;pointer-events:none;transition:opacity .15s}
+#refreshBtn{padding:5px 9px;font-size:16px;line-height:1;max-width:none}
+#refreshBtn.spin{animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.main{padding:14px 14px 90px;flex:1}
+.banner{background:var(--warn-soft);color:var(--warn);border-radius:10px;padding:9px 12px;font-size:13px;margin-bottom:12px}
+.banner.info{background:var(--accent-soft);color:var(--accent)}
+.search{display:flex;gap:8px;margin-bottom:10px}
+.search input{flex:1;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:10px 12px;font-size:16px}
+.chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:8px;-webkit-overflow-scrolling:touch}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 12px;font-size:12.5px;white-space:nowrap;cursor:pointer;color:var(--ink2)}
+.chip.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px}
+.summary.s3{grid-template-columns:repeat(3,1fr)}
+.summary.last{margin-bottom:12px}
+.tile{background:var(--surface);border-radius:var(--r);padding:10px 12px;box-shadow:var(--shadow)}
+.tile b{display:block;font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.2}
+.tile span{font-size:11.5px;color:var(--muted)}
+.tile.warn b{color:var(--warn)}
+.tile.crit b{color:var(--crit)}
+.tile.acc b{color:var(--accent)}
+.list{display:flex;flex-direction:column;gap:8px}
+.row{background:var(--surface);border-radius:var(--r);padding:12px 14px;box-shadow:var(--shadow);display:flex;align-items:center;gap:12px;cursor:pointer;border:1px solid transparent;text-align:left;width:100%}
+.row:active{border-color:var(--accent)}
+.row .body{flex:1;min-width:0}
+.row .t{font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .s{font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+.row .n{font-variant-numeric:tabular-nums;font-size:13px;color:var(--ink2);text-align:right;flex:none}
+.row .n b{display:block;font-size:18px;color:var(--ink)}
+.pill{display:inline-block;font-size:11px;font-weight:500;border-radius:999px;padding:2px 8px;line-height:1.5;vertical-align:middle}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.crit{background:var(--crit-soft);color:var(--crit)}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.ret{background:var(--retired-soft);color:var(--retired)}
+.pill.acc{background:var(--accent-soft);color:var(--accent)}
+.pill.flag{background:#fde68a;color:#7c2d12;font-weight:700}
+.fcard{border-left:4px solid #f59e0b}
+.flag{padding:8px 0;border-bottom:1px solid var(--line)}
+.flag:last-child{border-bottom:0}
+.flink{background:none;border:0;padding:0;font:inherit;font-weight:700;color:var(--accent);text-decoration:underline;cursor:pointer}
+.frel{margin-left:6px;font-size:12px;color:var(--muted)}
+.ftxt{white-space:pre-wrap;margin-top:2px}
+.fmeta{font-size:11px;color:var(--muted);margin-top:2px}
+.seg{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:6px}
+.seg .chk{display:inline-flex;flex-direction:row;align-items:center;gap:6px;width:auto;margin:0}
+.seg .chk input{width:18px;height:18px;flex:none;margin:0}
+.picked{font-size:13px;margin:4px 0 8px}
+.fbox{border:1px dashed var(--line);border-radius:10px;padding:8px 10px;margin:4px 0}
+.fbox .chk{display:flex;align-items:center;gap:8px;font-weight:600;font-size:13.5px;cursor:pointer}
+.fbox .chk input{width:18px;height:18px}
+.fbox .fopts{margin-top:8px}
+.fbox .fopts[hidden]{display:none!important}
+.chips .chip.on.pref{background:var(--ok);border-color:var(--ok)}
+.sec{margin-top:18px}
+.sec-h{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px}
+.sec-h h2{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0;font-weight:500}
+.sec-h .act{font-size:13px;color:var(--accent);background:none;border:0;cursor:pointer;padding:0}
+.card{background:var(--surface);border-radius:var(--r);box-shadow:var(--shadow);padding:4px 14px}
+.kv{display:grid;grid-template-columns:96px 1fr;gap:4px 12px;padding:9px 0;border-bottom:1px solid var(--line);font-size:14px}
+.kv:last-child{border-bottom:0}
+.kv .k{color:var(--muted);font-size:12.5px;padding-top:2px}
+.kv .v{word-break:break-word;white-space:pre-wrap}
+.kv .v:empty::before{content:"—";color:var(--line)}
+.kv .v.mono{font-family:var(--mono);font-size:13px}
+.hero{background:var(--surface);border-radius:var(--r);box-shadow:var(--shadow);padding:16px}
+.hero h2{margin:0 0 4px;font-size:20px;line-height:1.3;text-wrap:balance}
+.hero .sub{color:var(--muted);font-size:13px}
+.hero .pills{margin-top:8px;display:flex;flex-wrap:wrap;gap:6px}
+.wphoto{float:right;width:88px;height:88px;border-radius:12px;background:var(--surface2);margin:0 0 8px 12px;overflow:hidden;display:grid;place-items:center;font-size:11px;color:var(--muted);flex:none}
+.wphoto img{width:100%;height:100%;object-fit:cover;display:block}
+.wphoto img{cursor:zoom-in}
+.lb{position:fixed;inset:0;background:rgba(0,0,0,.88);display:grid;place-items:center;z-index:99;padding:16px}
+.lb img{width:min(92vw,560px);max-height:92vh;border-radius:12px;object-fit:contain;box-shadow:0 8px 40px rgba(0,0,0,.5)}
+.btns{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:9px 14px;font-size:14px;cursor:pointer;font-weight:500}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.ghost{background:transparent}
+.btn.danger{color:var(--crit)}
+.btn:disabled{opacity:.5;cursor:default}
+.btn.tel{display:inline-flex;align-items:center;gap:6px}
+form.f{display:flex;flex-direction:column;gap:10px;padding:12px 0}
+.f label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--muted)}
+.f input,.f select,.f textarea{border:1px solid var(--line);background:var(--bg);border-radius:9px;padding:9px 11px;font-size:16px;color:var(--ink);width:100%}
+.f textarea{min-height:84px;resize:vertical}
+.f .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.f .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.log{display:flex;gap:12px;padding:11px 0;border-bottom:1px solid var(--line)}
+.log:last-child{border-bottom:0}
+.log .when{flex:none;width:74px;font-family:var(--mono);font-size:12px;color:var(--muted);line-height:1.5;padding-top:2px}
+.log .who{font-size:12px;color:var(--ink2);margin-bottom:2px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.log .txt{white-space:pre-wrap;font-size:14px}
+.log .del{margin-left:auto;background:none;border:0;color:var(--muted);font-size:12px;cursor:pointer;padding:0}
+.empty{color:var(--muted);font-size:13.5px;padding:14px 0;text-align:center}
+.fab{position:fixed;right:16px;bottom:18px;z-index:6;background:var(--accent);color:var(--accent-ink);border:0;border-radius:999px;padding:12px 18px;font-size:14px;font-weight:700;box-shadow:var(--shadow);cursor:pointer}
+.toast{position:fixed;left:50%;bottom:76px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:999px;font-size:13px;z-index:9;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.show{opacity:1}
+.ov[hidden]{display:none}
+.ov{position:fixed;inset:0;background:rgba(10,14,20,.55);z-index:20;display:flex;align-items:flex-end;justify-content:center}
+.ov .sheet{background:var(--surface);width:100%;max-width:520px;border-radius:16px 16px 0 0;padding:18px 18px 28px;box-shadow:var(--shadow)}
+.ov h3{margin:0 0 6px;font-size:17px}
+.ov .cur{margin:0;font-size:14px}
+.ov .note{margin:4px 0 0;font-size:12.5px;color:var(--muted)}
+.kindtag{font-family:var(--mono);font-size:11px;background:var(--surface2);border-radius:5px;padding:1px 6px}
+.wgroup{margin-top:10px;font-size:12px;color:var(--muted);letter-spacing:.06em}
+.tabs{display:flex;gap:6px;padding:8px 14px 0}
+.tabs button{flex:1;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:8px;font-size:13.5px;font-weight:600;cursor:pointer;color:var(--ink2)}
+.tabs button.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.pstep{padding:10px 0;border-bottom:1px solid var(--line)}
+.pstep:last-of-type{border-bottom:0}
+.pstep .ph{display:flex;align-items:center;gap:10px}
+.pstep .pt{flex:1;min-width:0;display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:14px}
+.pstep.done .pt b{color:var(--muted);text-decoration:line-through}
+.pchk{width:28px;height:28px;border-radius:8px;border:2px solid var(--line);background:var(--surface);cursor:pointer;flex:none;font-weight:700;color:var(--accent-ink)}
+.pchk.on{background:var(--ok);border-color:var(--ok)}
+.pstep .pb{display:grid;grid-template-columns:150px 1fr;gap:8px;margin-top:8px}
+.pstep .pb label{display:flex;flex-direction:column;gap:3px;font-size:11.5px;color:var(--muted)}
+.pstep .pb input{border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:7px 9px;font-size:15px;color:var(--ink);width:100%}
+.sub{display:flex;align-items:center;gap:8px;font-size:13.5px;padding:4px 0 4px 38px;cursor:pointer}
+.sub input{width:18px;height:18px;flex:none}
+.pstep.done .sub{color:var(--muted)}
+.pchk{display:grid;place-items:center;font-size:11px;color:var(--ink2)}
+.pchk.on{color:var(--accent-ink)}
+@media (max-width:420px){.pstep .pb{grid-template-columns:1fr}}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <button class="back" id="back" aria-label="戻る">‹</button>
+    <h1 id="title"><span class="brand">Linola 特定技能</span>支援台帳</h1>
+    <button class="staff" id="refreshBtn" title="最新に更新" aria-label="最新に更新" type="button">↻</button>
+<button class="staff" id="staffBtn" title="入力者名を設定"><span class="dot" id="dot"></span><span id="staffName">担当者未設定</span></button>
+  </header>
+  <nav class="tabs"><button data-tab="home" class="on" type="button">支援台帳</button><button data-tab="pre" type="button">入国前（内定後）</button></nav>
+<main class="main" id="main"></main>
+</div>
+<div class="toast" id="toast"></div>
+<div class="ov" id="staffOv" hidden></div>
+
+<script>
+(() => {
+"use strict";
+const $ = (s, el=document) => el.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const KINDS = ["訪問","電話","面談","書類","入管","生活支援","その他"];
+const S = { companies:{}, workers:{}, logs:{}, ready:false, refreshedAt:"", busy:false };
+let staff = "";
+try { staff = localStorage.getItem("linola.staff") || ""; } catch(e){}
+// 担当者キー（?k=）は保存先（Google側）で氏名に変換する。変換結果は端末に記憶して毎回は問い合わせない
+const URL_KEY = (new URLSearchParams(location.search).get("k") || "").trim();
+let KEY_DONE = ""; try{ KEY_DONE = localStorage.getItem("linola.key") || ""; }catch(e){}
+
+// ---------- server ----------
+const API = "https://script.google.com/macros/s/AKfycbzqWNTd8wMVere3jQVfqRdQi_0kg4PGHdiqFtgvk-3yUNFaMkaUOG6_Su0JQIxcdXb5/exec";
+const call = async (fn, ...args) => {
+  const r = await fetch(API, { method:"POST", body: JSON.stringify({ fn, args }), redirect:"follow" });
+  const t = await r.text(); let j; try{ j = JSON.parse(t); }catch(e){ throw new Error("サーバー応答が不正です"); }
+  if(!j.ok) throw new Error(j.error || "error"); return j.result;
+};
+async function resolveKey(){
+  if(!URL_KEY || KEY_DONE===URL_KEY) return;
+  try{ const nm = await call("resolveStaff", URL_KEY); if(nm){ staff = nm; try{ localStorage.setItem("linola.staff", nm); localStorage.setItem("linola.key", URL_KEY); }catch(e){} KEY_DONE = URL_KEY; const b=$("#staffName"); if(b) b.textContent = nm; } }catch(e){}
+}
+function applyData(d, fromCache){
+  S.companies={}; S.workers={}; S.logs={};
+  d.companies.forEach(c=>S.companies[c.id]=c); d.workers.forEach(w=>S.workers[w.id]=w); d.logs.forEach(l=>S.logs[l.id]=l);
+  S.refreshedAt=d.refreshedAt; S.fromCache=!!fromCache; S.ready=true; if(!fromCache) S.lastFetch=Date.now(); S.staffList=d.staffList||[]; S.flags=d.flags||[]; S.pre={}; (d.pre||[]).forEach(p=>S.pre[p.id]=p); S.preCands=d.preCands||[]; S.preSteps=d.preSteps||S.preSteps||[];
+  if(!staff && !S.pickerShown){ S.pickerShown=true; setTimeout(()=>openStaff(true),0); }
+}
+async function load(silent){
+  if(!silent && !S.ready){
+    try{ const c=JSON.parse(localStorage.getItem("linola.cache")||"null"); if(c && c.companies){ applyData(c, true); } }catch(e){}
+    render();
+  }
+  setDot("sync");
+  try{
+    const [d] = await Promise.all([call("getAll"), resolveKey()]);
+    applyData(d, false);
+    try{ localStorage.setItem("linola.cache", JSON.stringify(d)); }catch(e){}
+    setDot("on"); render();
+  }catch(e){ setDot("err"); toast("読み込みに失敗: "+(e.message||e)); if(!S.ready){ $("#main").innerHTML=`<div class="empty">読み込みに失敗しました<br><button class="btn" onclick="location.reload()">再読み込み</button></div>`; } }
+}
+function setDot(st){ const d=$("#dot"); d.className="dot "+(st==="on"?"on":st==="sync"?"local":""); d.title = st==="on"?"サーバーと同期済み":st==="sync"?"同期中…":"同期エラー"; }
+
+// ---------- helpers ----------
+const today = () => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
+const parseDate = s => { if(!s) return null; const m=String(s).match(/(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/); return m? new Date(+m[1],+m[2]-1,+m[3]) : null; };
+const daysTo = s => { const d=parseDate(s); if(!d) return null; return Math.round((d - new Date().setHours(0,0,0,0))/864e5); };
+// 在留申請中：申請日が入国日より後で、有効期限が切れた／90日以内（＝更新申請中）。新しい有効期限が入れば自動で通常に戻る
+const applying = w => { const a=parseDate(w.applyDate), e=parseDate(w.entry); if(!a||!e||a<=e) return false; const n=daysTo(w.expiry); return n===null || n<=90; };
+const exDays = w => applying(w) ? null : daysTo(w.expiry);
+const expiryPill = w => { if(w.retired) return `<span class="pill ret">退職</span>`; let p=w.pending?`<span class="pill warn">退職予定${w.retireDate?" "+esc(w.retireDate):""}</span> `:""; if(applying(w)) return p+`<span class="pill acc">申請中</span>`; const n=exDays(w); if(n===null) return p; if(n<0) return p+`<span class="pill crit">期限切れ ${-n}日</span>`; if(n<=90) return p+`<span class="pill warn">期限まで${n}日</span>`; if(w.expiryUpdated) return p+`<span class="pill ok">更新済</span>`; return p; };
+const toast = m => { const t=$("#toast"); t.textContent=m; t.classList.add("show"); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove("show"),2000); };
+const sortLogs = arr => arr.sort((a,b)=> (b.date||"").localeCompare(a.date||"") || (b.createdAt||"").localeCompare(a.createdAt||""));
+const lastLog = pred => { const l=Object.values(S.logs).filter(pred); return l.length? sortLogs(l)[0] : null; };
+const workersOf = cid => Object.values(S.workers).filter(w=>w.cid===cid).sort((a,b)=> (a.retired-b.retired) || a.name.localeCompare(b.name));
+const setStaff = v => { staff=v; try{localStorage.setItem("linola.staff",staff);}catch(e){} };
+const toISO = s => { const d=parseDate(s); return d? `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}` : ""; };
+const followOf = c => { const list=[c.follow, ...workersOf(c.id).map(w=>w.follow)].filter(f=>f&&f.open).map(f=>Object.assign({}, f, {days:daysTo(f.next)})); if(!list.length) return null; list.sort((a,b)=>((a.days??1e9)-(b.days??1e9)) || (b.level-a.level)); return list[0]; };
+const followPill = f => { if(!f||!f.open) return ""; const d=("days" in f)? f.days : daysTo(f.next); const lv="●".repeat(f.level||2)+"○".repeat(3-(f.level||2)); let t="対応中 "+lv; if(d!==null) t+= d<0?` 超過${-d}日`:d===0?" 今日":` あと${d}日`; const cls=(d!==null&&d<=3)?"crit":((d!==null&&d<=7)||f.level>=3)?"warn":"acc"; return `<span class="pill ${cls}">${t}</span>`; };
+
+// ---------- routing ----------
+function route(){ const h=location.hash.replace(/^#\/?/,""); const p=h.split("/"); return {view:p[0]||"home", id:decodeURIComponent(p[1]||"")}; }
+const go = h => { location.hash=h; };
+window.addEventListener("hashchange", ()=>{ window.scrollTo(0,0); render(); });
+$("#back").addEventListener("click", ()=>{ const r=route(); if(r.view==="w"){ const w=S.workers[r.id]; go(w? `#/c/${encodeURIComponent(w.cid)}` : "#/"); } else if(r.view==="newworker"){ go(`#/c/${encodeURIComponent(r.id)}`); } else if(r.view==="prec"||r.view==="newpre"){ go("#/pre"); } else go("#/"); });
+$("#staffBtn").addEventListener("click", ()=>openStaff(false));
+// ---------- 更新（手動ボタン・引っぱって更新・復帰時/定期の自動更新） ----------
+const busyInput=()=>{ const a=document.activeElement; return !!(a && (a.tagName==="INPUT"||a.tagName==="TEXTAREA"||a.tagName==="SELECT")); };
+async function refresh(manual){ if(S.loading) return; if(!manual && busyInput()) return; S.loading=true; const b=$("#refreshBtn"); b.classList.add("spin"); try{ await load(true); if(manual) toast("最新に更新しました"); } finally { S.loading=false; b.classList.remove("spin"); } }
+$("#refreshBtn").addEventListener("click", ()=>refresh(true));
+document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible" && Date.now()-(S.lastFetch||0)>60000) refresh(false); });
+setInterval(()=>{ if(document.visibilityState==="visible" && Date.now()-(S.lastFetch||0)>180000) refresh(false); }, 30000);
+let ptrY=null; const ptr=document.createElement("div"); ptr.className="ptr"; ptr.textContent="↓ 引っぱって更新"; document.body.appendChild(ptr);
+document.addEventListener("touchstart", e=>{ ptrY = (window.scrollY<=0 && !busyInput()) ? e.touches[0].clientY : null; ptr.dataset.go=""; }, {passive:true});
+document.addEventListener("touchmove", e=>{ if(ptrY===null) return; const d=e.touches[0].clientY-ptrY; if(d>20){ ptr.style.opacity=String(Math.min(1,(d-20)/60)); const go=d>90; ptr.textContent = go ? "↑ 離して更新" : "↓ 引っぱって更新"; ptr.dataset.go = go ? "1" : ""; } }, {passive:true});
+document.addEventListener("touchend", ()=>{ if(ptrY!==null && ptr.dataset.go==="1") refresh(true); ptrY=null; ptr.style.opacity="0"; ptr.dataset.go=""; }, {passive:true});
+function openStaff(first){
+  const ov=$("#staffOv"); const list=S.staffList||[];
+  const opts=list.map(n=>`<option value="${esc(n)}" ${n===staff?"selected":""}>${esc(n)}</option>`).join("");
+  ov.innerHTML=`<div class="sheet">
+    <h3>${staff?"担当者":"担当者を選んでください"}</h3>
+    ${staff?`<p class="cur">この端末の担当者：<b>${esc(staff)}</b></p><p class="note">変更するにはパスコードが必要です（管理者に確認）。</p>`:`<p class="note">この端末で入力する人の名前です。一度決めると次回から自動で入ります。</p>`}
+    <form class="f" id="sf">
+      ${list.length?`<label>名前<select name="name" required><option value="">選択してください</option>${opts}</select></label>`:`<label>名前（スタッフ一覧が未設定のため手入力）<input name="name" value="${esc(staff)}" required></label>`}
+      ${staff?`<label>パスコード<input name="pin" type="password" inputmode="numeric" autocomplete="off" required></label>`:""}
+      <div class="btns"><button class="btn primary" type="submit">${staff?"変更する":"決定"}</button>${staff||!first?`<button class="btn ghost" type="button" id="sfCancel">閉じる</button>`:""}</div>
+    </form></div>`;
+  ov.hidden=false;
+  const c=$("#sfCancel"); if(c) c.addEventListener("click", ()=>{ ov.hidden=true; });
+  $("#sf").addEventListener("submit", async e=>{
+    e.preventDefault(); const f=new FormData(e.target); const name=(f.get("name")||"").trim(); if(!name) return;
+    const btn=e.target.querySelector("button"); btn.disabled=true;
+    if(staff){ let ok=false; try{ ok=await call("checkPin", (f.get("pin")||"").trim()); }catch(_){ } if(!ok){ toast("パスコードが違います"); btn.disabled=false; return; } }
+    setStaff(name); ov.hidden=true; toast("担当者：" + name); render();
+  });
+}
+
+// ---------- views ----------
+let filt = {q:"", prefs:[], flags:[]};
+function render(){
+  $("#staffName").textContent = staff || "担当者未設定";
+  const r = route();
+  $("#back").disabled = r.view==="home"||r.view==="pre"; syncTabs(r.view);
+  if(!S.ready){ $("#main").innerHTML=`<div class="empty">読み込み中…</div>`; $("#title").innerHTML=`<span class="brand">Linola 特定技能</span>支援台帳`; return; }
+  if(r.view==="pre") return viewPre();
+  if(r.view==="prec") return viewPreCase(r.id);
+  if(r.view==="newpre") return viewPreForm(null, r.id? (S.preCands||[]).find(c=>c.wid===r.id) : null);
+  if(r.view==="c") return viewCompany(r.id);
+  if(r.view==="w") return viewWorker(r.id);
+  if(r.view==="newcompany") return viewCompanyForm(null);
+  if(r.view==="newworker") return viewWorkerForm(null, r.id);
+  return viewHome();
+}
+
+function viewHome(){
+  $("#title").innerHTML=`<span class="brand">Linola 特定技能</span>支援台帳`;
+  const all = Object.values(S.companies).sort((a,b)=>a.name.localeCompare(b.name,"ja"));
+  const prefs=[...new Set(all.map(c=>c.pref).filter(Boolean))].sort();
+  const active = Object.values(S.workers).filter(w=>!w.retired);
+  const expired = active.filter(w=>{const n=exDays(w); return n!==null && n<0;});
+  const warn = active.filter(w=>{const n=exDays(w); return n!==null && n>=0 && n<=90;});
+  const entered = active.filter(w=>w.entry||w.cardNo), waiting = active.filter(w=>!w.entry&&!w.cardNo);
+  const soon = warn.filter(w=>exDays(w)<=30), warn90 = warn.filter(w=>exDays(w)>30), applyN = active.filter(applying);
+  const fAll=all.map(followOf).filter(Boolean); const nFollow=fAll.length, nDue=fAll.filter(f=>f.days!==null&&f.days<=7).length;
+  $("#main").innerHTML = `
+    <div class="summary s3">
+      <div class="tile"><b>${all.length}</b><span>受入企業数</span></div>
+      <div class="tile"><b>${entered.length}</b><span>入国在職中</span></div>
+      <div class="tile"><b>${waiting.length}</b><span>入国待ち</span></div>
+    </div>
+    <div class="summary last">
+      <div class="tile ${warn90.length?"warn":""}"><b>${warn90.length}</b><span>90日以内</span></div>
+      <div class="tile ${soon.length?"warn":""}"><b>${soon.length}</b><span>30日以内</span></div>
+      <div class="tile ${applyN.length?"acc":""}"><b>${applyN.length}</b><span>申請中</span></div>
+      <div class="tile ${expired.length?"crit":""}"><b>${expired.length}</b><span>期限切れ</span></div>
+    </div>
+    <div class="search"><input id="q" type="search" placeholder="企業名・店舗・外国人名で検索" value="${esc(filt.q)}" autocomplete="off"></div>
+    <div class="chips">
+      <button class="chip ${!filt.flags.length&&!filt.prefs.length?"on":""}" data-clear="1">すべて</button>
+      ${[["follow","対応中"+(nFollow?` ${nFollow}`:"")],["due","対応期限7日以内"+(nDue?` ${nDue}`:"")],["active","在職者あり"],["expired","期限切れ"],["warn","90日以内"],["apply","申請中"],["pending","退職予定"],["retired","退職者あり"]].map(([k,l])=>`<button class="chip ${filt.flags.includes(k)?"on":""}" data-flag="${k}">${l}</button>`).join("")}
+      ${prefs.map(p=>`<button class="chip pref ${filt.prefs.includes(p)?"on":""}" data-pref="${esc(p)}">${esc(p)}</button>`).join("")}
+    </div>
+    <div class="empty" style="font-size:11.5px;padding:0 0 6px">絞り込みは複数選べます（都道府県は「どれか」、他は「すべて満たす」）</div>
+    <div class="list" id="list"></div>
+    <div class="empty" style="font-size:12px">参照元の更新: ${esc(S.refreshedAt)}${S.fromCache?"（端末保存のデータ・更新中）":""} · <a href="#" id="reload">最新を読み込む</a></div>
+    <button class="fab" data-go="#/newcompany">＋ 企業を追加</button>`;
+  homeList();
+  const qi=$("#q"); let composing=false;
+  qi.addEventListener("compositionstart", ()=>{ composing=true; });
+  qi.addEventListener("compositionend", e=>{ composing=false; filt.q=e.target.value; homeList(); });
+  qi.addEventListener("input", e=>{ if(composing) return; filt.q=e.target.value; homeList(); });
+  $("#reload").addEventListener("click", async e=>{ e.preventDefault(); toast("参照元を再読み込み中…"); try{ await call("refreshReference"); }catch(_){} load(true); });
+  wire();
+}
+function homeList(){
+  const el=$("#list"); if(!el) return;
+  const all = Object.values(S.companies).sort((a,b)=>a.name.localeCompare(b.name,"ja"));
+  const q=filt.q.trim();
+  const has=k=>filt.flags.includes(k); const fmap={};
+  let rows = all.filter(c=>{
+    if(filt.prefs.length && !filt.prefs.includes(c.pref)) return false;
+    const ws=workersOf(c.id); const fs=followOf(c); fmap[c.id]=fs;
+    if(has("follow") && !fs) return false;
+    if(has("due") && !(fs && fs.days!==null && fs.days<=7)) return false;
+    if(has("apply") && !ws.some(w=>!w.retired && applying(w))) return false;
+    if(has("warn") && !ws.some(w=>{const n=exDays(w); return !w.retired && n!==null && n>=0 && n<=90;})) return false;
+    if(has("expired") && !ws.some(w=>{const n=exDays(w); return !w.retired && n!==null && n<0;})) return false;
+    if(has("pending") && !ws.some(w=>!w.retired && w.pending)) return false;
+    if(has("retired") && !ws.some(w=>w.retired)) return false;
+    if(has("active") && !ws.some(w=>!w.retired)) return false;
+    if(q){ const hay=[c.name,c.store,c.city,c.pref,c.contact,...ws.map(w=>w.name+w.kana)].join(" ").toLowerCase(); if(!hay.includes(q.toLowerCase())) return false; }
+    return true;
+  });
+  if(has("follow")||has("due")) rows.sort((a,b)=>{ const fa=fmap[a.id], fb=fmap[b.id]; return ((fa.days??1e9)-(fb.days??1e9)) || (fb.level-fa.level); });
+  el.innerHTML = rows.map(c=>{ const ws=workersOf(c.id); const act=ws.filter(w=>!w.retired).length; const wl=lastLog(l=>l.cid===c.id); const hasExp=ws.some(w=>{const n=exDays(w); return !w.retired&&n!==null&&n<0;}); const hasWarn=!hasExp&&ws.some(w=>{const n=exDays(w); return !w.retired&&n!==null&&n<=90;});
+        return `<button class="row" data-go="#/c/${encodeURIComponent(c.id)}"><div class="body"><div class="t">${esc(c.name)} ${followPill(fmap[c.id])}${flagPill("company",c.id)}${hasExp?'<span class="pill crit">期限切れ</span>':hasWarn?'<span class="pill warn">期限注意</span>':""}${c.src==="own"?'<span class="pill acc">追加</span>':""}</div><div class="s">${esc([c.pref,c.city].filter(Boolean).join(" "))}${c.store?" · "+esc(c.store):""}${wl?" · 最終対応 "+esc(wl.date):""}</div></div><div class="n"><b>${act}</b>名${ws.length-act?`<span style="color:var(--muted)">/退${ws.length-act}</span>`:""}</div></button>`; }).join("") || `<div class="empty">該当する企業がありません</div>`;
+  el.querySelectorAll("[data-go]").forEach(b=>b.addEventListener("click", ()=>go(b.dataset.go)));
+}
+
+function wire(){
+  document.querySelectorAll("[data-go]").forEach(b=>b.addEventListener("click", ()=>go(b.dataset.go)));
+  document.querySelectorAll(".chip").forEach(b=>b.addEventListener("click", ()=>{ const tog=(arr,v)=>{ const i=arr.indexOf(v); if(i>=0) arr.splice(i,1); else arr.push(v); }; if(b.dataset.clear){ filt.prefs=[]; filt.flags=[]; } else if(b.dataset.pref){ tog(filt.prefs,b.dataset.pref); } else if(b.dataset.flag){ tog(filt.flags,b.dataset.flag); }
+    document.querySelectorAll(".chip").forEach(c=>{ let on=false; if(c.dataset.clear) on=!filt.flags.length&&!filt.prefs.length; else if(c.dataset.pref) on=filt.prefs.includes(c.dataset.pref); else if(c.dataset.flag) on=filt.flags.includes(c.dataset.flag); c.classList.toggle("on",on); });
+    homeList(); }));
+}
+
+function kv(k,v,mono){ return `<div class="kv"><div class="k">${esc(k)}</div><div class="v ${mono?"mono":""}">${esc(v)}</div></div>`; }
+function telBtn(t){ const n=String(t||"").match(/0\d[\d\-]{7,12}/); return n? `<a class="btn tel" href="tel:${n[0].replace(/-/g,"")}">📞 ${esc(n[0])}</a>`:""; }
+
+function logSection(scope, pred, rec){
+  const logs = sortLogs(Object.values(S.logs).filter(pred)); const f=rec&&rec.follow&&rec.follow.open?rec.follow:null;
+  return `<section class="sec"><div class="sec-h"><h2>対応履歴 ${logs.length?`(${logs.length})`:""}</h2></div>
+    <div class="card">
+      <form class="f" id="logForm">
+        <div class="grid3">
+          <label>日付<input name="date" type="date" value="${today()}" required></label>
+          <label>種別<select name="kind">${KINDS.map(k=>`<option>${k}</option>`).join("")}</select></label>
+          <label>入力者<input value="${esc(staff||"未設定")}" disabled></label>
+        </div>
+        <label>内容<textarea name="text" placeholder="行ったこと・話した内容・次にやること" required></textarea></label>
+        <div class="fbox">
+          <label class="chk"><input type="checkbox" name="fopen" id="fopen" ${f?"checked":""}> 継続対応中（対応中フラグを立てる）${f?` <span style="font-weight:400;color:var(--muted)">現在: ${esc(f.staff||"")} ${esc(f.at||"")}</span>`:""}</label>
+          <div class="grid2 fopts" id="fopts" ${f?"":"hidden"}>
+            <label>対応レベル<select name="flevel">${[1,2,3].map(n=>`<option value="${n}" ${(f?f.level:2)===n?"selected":""}>${n} ${["低","中","高（急ぎ）"][n-1]}</option>`).join("")}</select></label>
+            <label>次回対応日<input name="fnext" type="date" value="${f?toISO(f.next):""}"></label>
+          </div>
+          <div class="empty" style="font-size:11.5px;padding:6px 0 0;text-align:left">チェックを外して履歴を追加すると「対応完了」になりフラグが消えます。</div>
+        </div>
+        <div class="btns"><button class="btn primary" type="submit">履歴を追加</button></div>
+      </form>
+    </div>
+    <div class="card" style="margin-top:8px">
+      ${logs.map(l=>`<div class="log"><div class="when">${esc(l.date)}</div><div style="flex:1;min-width:0"><div class="who"><span class="kindtag">${esc(l.kind||"")}</span>${esc(l.staff||"")}${scope==="company"&&l.wid?`<span class="pill acc">${esc(l.wname||"")}</span>`:""}<button class="del" data-del="${esc(l.id)}">削除</button></div><div class="txt">${esc(l.text)}</div></div></div>`).join("") || `<div class="empty">まだ履歴がありません</div>`}
+    </div></section>`;
+}
+function wireLogs(base, rec){
+  $("#fopen").addEventListener("change", e=>{ $("#fopts").hidden=!e.target.checked; });
+  $("#logForm").addEventListener("submit", async e=>{
+    e.preventDefault(); const f=new FormData(e.target); const st=staff;
+    if(!st){ toast("先に担当者を選んでください"); openStaff(true); return; }
+    const open=!!f.get("fopen"); const follow={open, level:Number(f.get("flevel"))||2, next:open?(f.get("fnext")||"").replace(/-/g,"/"):""};
+    const data=Object.assign({}, base, {date:f.get("date"), kind:f.get("kind"), staff:st, text:(f.get("text")||"").trim(), follow});
+    if(!data.text) return;
+    const btn=e.target.querySelector("button[type=submit]"); btn.disabled=true; btn.textContent="保存中…";
+    try{ const id=await call("addLog", data); const {follow:_f, ...lg}=data; S.logs[id]=Object.assign({id, createdAt:new Date().toISOString()}, lg); if(rec) rec.follow = open? {open:true, level:follow.level, next:follow.next, staff:st, at:today()} : null; try{ const c=JSON.parse(localStorage.getItem("linola.cache")||"null"); if(c){ const t=(rec&&rec.cid!==undefined? c.workers : c.companies).find(x=>x.id===(rec&&rec.id)); if(t) t.follow=rec.follow; localStorage.setItem("linola.cache", JSON.stringify(c)); } }catch(_){} toast(open?"履歴を追加（対応中）":"履歴を追加しました"); render(); }
+    catch(err){ toast("保存に失敗: "+(err.message||err)); btn.disabled=false; btn.textContent="履歴を追加"; }
+  });
+  document.querySelectorAll("[data-del]").forEach(b=>b.addEventListener("click", async ()=>{ if(!confirm("この履歴を削除しますか？")) return; try{ await call("deleteLog", b.dataset.del); delete S.logs[b.dataset.del]; toast("削除しました"); render(); }catch(err){ toast("削除に失敗"); } }));
+}
+
+function viewCompany(id){
+  const c=S.companies[id]; if(!c){ $("#main").innerHTML=`<div class="empty">企業が見つかりません</div>`; return; }
+  $("#title").innerHTML=`<span class="brand">受入企業</span>${esc(c.name)}`;
+  const ws=workersOf(id); const act=ws.filter(w=>!w.retired), ret=ws.filter(w=>w.retired);
+  const wrow = w => `<button class="row" data-go="#/w/${encodeURIComponent(w.id)}"><div class="body"><div class="t">${esc(w.name)} ${followPill(w.follow)}${flagPill("worker",w.id)}${expiryPill(w)}</div><div class="s">${esc([w.kana,w.nationality,w.jp].filter(Boolean).join(" · "))}${w.entry?" · 入国 "+esc(w.entry):""}</div></div><div class="n">›</div></button>`;
+  $("#main").innerHTML = `
+    <div class="hero"><h2>${esc(c.name)}</h2><div class="sub">${esc([c.pref,c.city].filter(Boolean).join(" "))}${c.field?" · "+esc(c.field):""}${c.category?" · "+esc(c.category):""}</div>
+      <div class="pills">${followPill(c.follow)}<span class="pill acc">在職 ${act.length}名</span>${ret.length?`<span class="pill ret">退職 ${ret.length}名</span>`:""}${c.fee?`<span class="pill ok">支援費 ${esc(c.fee)}</span>`:""}</div>
+      <div class="btns">${telBtn(c.tel)}<button class="btn" id="editC">${c.src==="own"?"情報を編集":"補足メモを編集"}</button></div>
+    </div>
+    ${flagSection("company", c)}
+    <section class="sec"><div class="sec-h"><h2>企業情報${c.src==="ref"?"（Linola表より・参照のみ）":""}</h2></div><div class="card">
+      ${kv("受入店舗",c.store)}${kv("代表者",c.rep)}${kv("担当者",c.contact)}${kv("連絡先",c.tel,true)}${kv("メール",c.email,true)}${kv("勤務地",c.workplace)}${kv("支援費(税込)",c.fee,true)}${kv("補足メモ",c.memo)}
+    </div></section>
+    <section class="sec"><div class="sec-h"><h2>所属の外国人</h2><button class="act" data-go="#/newworker/${encodeURIComponent(id)}">＋ 追加</button></div>
+      <div class="list">${act.map(wrow).join("") || `<div class="empty">在職中の登録がありません</div>`}
+      ${ret.length?`<div class="wgroup">退職者</div>${ret.map(wrow).join("")}`:""}</div>
+    </section>
+    ${logSection("company", l=>l.cid===id, c)}`;
+  wire(); wireLogs({type:"company", cid:id, cname:c.name, wid:"", wname:""}, c); wireFlags("company", c);
+  $("#editC").addEventListener("click", ()=> c.src==="own" ? viewCompanyForm(c) : viewMemoForm(c,"company"));
+}
+
+// ---- 要チェック（重要情報）：人・企業とのつながり＋自由メモ。本人のページと相手のページの両方に出る ----
+const flagsOf = (type,id) => (S.flags||[]).filter(f => (f.type===type && f.tid===id) || (f.kind==="rel" && f.otype===type && f.oid===id));
+const flagPill = (type,id) => { const n=flagsOf(type,id).length; return n ? `<span class="pill flag">要チェック ${n}</span>` : ""; };
+function flagSection(type, rec){
+  const fl = flagsOf(type, rec.id);
+  const item = f => {
+    const mine = f.type===type && f.tid===rec.id;
+    const meta = `<div class="fmeta">${esc(f.staff||"")} ${esc(String(f.createdAt||"").slice(0,10))}${mine?` <button class="del" data-fdel="${esc(f.id)}">削除</button>`:""}</div>`;
+    if(f.kind==="rel"){
+      const ot = mine ? f.otype : f.type, oid = mine ? f.oid : f.tid, on = mine ? f.oname : f.tname;
+      const go = ot==="worker" ? "#/w/"+encodeURIComponent(oid) : "#/c/"+encodeURIComponent(oid);
+      return `<div class="flag"><button type="button" class="flink" data-go="${go}">${ot==="worker"?"👤":"🏢"} ${esc(on)}</button><span class="frel">${esc(f.rel||"関係あり")}</span>${f.text?`<div class="ftxt">${esc(f.text)}</div>`:""}${meta}</div>`;
+    }
+    return `<div class="flag"><div class="ftxt">${esc(f.text)}</div>${meta}</div>`;
+  };
+  return `<section class="sec"><div class="sec-h"><h2>要チェック${fl.length?` <span class="pill flag">${fl.length}</span>`:""}</h2><button class="act" id="addFlag">＋ 追加</button></div>
+    <div class="card fcard">${fl.map(item).join("") || `<div class="empty">重要情報はありません（つながり・注意点を登録できます）</div>`}</div></section>`;
+}
+function wireFlags(type, rec){
+  const b=$("#addFlag"); if(b) b.addEventListener("click", ()=>viewFlagForm(type, rec));
+  document.querySelectorAll("[data-fdel]").forEach(b=>b.addEventListener("click", async ()=>{ if(!confirm("この要チェック項目を削除しますか？")) return; try{ await call("deleteFlag", b.dataset.fdel); S.flags=(S.flags||[]).filter(f=>f.id!==b.dataset.fdel); toast("削除しました"); render(); }catch(err){ toast("削除に失敗"); } }));
+}
+function viewFlagForm(type, rec){
+  $("#title").innerHTML=`<span class="brand">要チェック</span>${esc(rec.name)}`;
+  $("#main").innerHTML=`<div class="card"><form class="f" id="ff">
+    <div class="seg"><label class="chk"><input type="radio" name="kind" value="rel" checked> 人・企業とのつながり</label><label class="chk"><input type="radio" name="kind" value="memo"> 自由メモ</label></div>
+    <div id="relBox">
+      <label>相手を検索<input id="fq" placeholder="名前・企業名で検索（台帳に登録済みの人・企業）" autocomplete="off"></label>
+      <div class="list" id="fres"></div>
+      <div class="picked" id="fpicked">相手：未選択</div>
+      <label>関係<input name="rel" list="rels" placeholder="例：知り合い・親族・同郷・元同僚・紹介者"><datalist id="rels"><option value="知り合い"><option value="友人"><option value="親族"><option value="同郷"><option value="元同僚"><option value="紹介者"><option value="元勤務先"><option value="取引先"></datalist></label>
+    </div>
+    <label>内容<textarea name="text" placeholder="重要なこと・注意点（つながりの場合は補足）"></textarea></label>
+    <div class="btns"><button class="btn primary" type="submit">保存</button><button class="btn ghost" type="button" id="cancel">キャンセル</button></div>
+  </form></div>`;
+  let picked=null;
+  const cands = [...Object.values(S.workers).map(w=>({t:"worker",id:w.id,name:w.name,sub:(S.companies[w.cid]||{}).name||""})), ...Object.values(S.companies).map(c=>({t:"company",id:c.id,name:c.name,sub:[c.pref,c.city].filter(Boolean).join(" ")}))].filter(x=>!(x.t===type&&x.id===rec.id));
+  const nk = s => String(s||"").toLowerCase().replace(/\s/g,"");
+  const show = q => { const k=nk(q); const r = k ? cands.filter(x=>nk(x.name).includes(k)||nk(x.sub).includes(k)).slice(0,8) : [];
+    $("#fres").innerHTML = r.map((x,i)=>`<button type="button" class="row" data-pick="${i}"><div class="body"><div class="t">${x.t==="worker"?"👤":"🏢"} ${esc(x.name)}</div><div class="s">${esc(x.sub)}</div></div></button>`).join("");
+    document.querySelectorAll("[data-pick]").forEach(b=>b.addEventListener("click", ()=>{ picked=r[Number(b.dataset.pick)]; $("#fpicked").innerHTML=`相手：<b>${picked.t==="worker"?"👤":"🏢"} ${esc(picked.name)}</b>`; $("#fres").innerHTML=""; $("#fq").value=""; })); };
+  $("#fq").addEventListener("input", e=>show(e.target.value));
+  document.querySelectorAll("[name=kind]").forEach(r=>r.addEventListener("change", ()=>{ $("#relBox").hidden = document.querySelector("[name=kind]:checked").value!=="rel"; }));
+  $("#cancel").addEventListener("click", render);
+  $("#ff").addEventListener("submit", async e=>{ e.preventDefault(); const f=new FormData(e.target); const st=staff; if(!st){ toast("先に担当者を選んでください"); openStaff(true); return; }
+    const kind=f.get("kind"); const text=(f.get("text")||"").trim();
+    if(kind==="rel" && !picked){ toast("相手を選んでください"); return; }
+    if(kind==="memo" && !text){ toast("内容を入力してください"); return; }
+    const o={type, tid:rec.id, tname:rec.name, kind, otype:picked?picked.t:"", oid:picked?picked.id:"", oname:picked?picked.name:"", rel:kind==="rel"?(f.get("rel")||"").trim():"", text, staff:st};
+    const btn=e.target.querySelector("button"); btn.disabled=true;
+    try{ const id=await call("addFlag", o); S.flags=S.flags||[]; S.flags.push(Object.assign({id, createdAt:new Date().toISOString()}, o)); toast("保存しました"); render(); }catch(err){ toast("保存に失敗: "+(err.message||err)); btn.disabled=false; }
+  });
+}
+
+function viewMemoForm(rec, type){
+  $("#title").innerHTML=`<span class="brand">補足メモ</span>${esc(rec.name)}`;
+  $("#main").innerHTML=`<div class="banner info">Linola表の元データは変更しません。ここで書いた内容は自社の履歴スプシに保存されます。</div>
+  <div class="card"><form class="f" id="mf">
+    ${type==="worker"?`<div class="grid2"><label>状態<select name="status"><option value="">（Linola表のまま）</option><option value="在職" ${rec.status==="在職"?"selected":""}>在職</option><option value="退職予定" ${rec.status==="退職予定"?"selected":""}>退職予定</option><option value="退職" ${rec.status==="退職"?"selected":""}>退職</option></select></label><label>退職日（予定日）<input name="retireDate" value="${esc(rec.retireDate)}" placeholder="2026/09/30"></label></div>
+    <div class="grid2"><label>新しい在留カード番号<input name="newCard" value="${esc(rec.newCard||"")}" placeholder="更新後の番号"></label><label>新しい有効期限<input name="newExpiry" value="${esc(rec.newExpiry||"")}" placeholder="2028/01/23"></label></div>
+    <div class="banner info" style="margin:0">在留カードを更新した人はここに新しい番号・期限を入れる。こっちの画面だけ新しい期限で表示され、Linola表は変わらない（「マスタ反映」は別途）。</div>`:""}
+    <label>補足メモ<textarea name="memo" style="min-height:120px">${esc(rec.memo)}</textarea></label>
+    <div class="btns"><button class="btn primary" type="submit">保存する</button><button class="btn ghost" type="button" id="cancel">キャンセル</button></div>
+  </form></div>`;
+  $("#cancel").addEventListener("click", render);
+  $("#mf").addEventListener("submit", async e=>{ e.preventDefault(); const f=new FormData(e.target); const st=staff; if(!st){ toast("先に担当者を選んでください"); openStaff(true); return; }
+    const o={id:rec.id, type, memo:(f.get("memo")||"").trim(), status:f.get("status")||"", retireDate:(f.get("retireDate")||"").trim(), newCard:(f.get("newCard")||"").trim(), newExpiry:(f.get("newExpiry")||"").trim(), staff:st};
+    const btn=e.target.querySelector("button"); btn.disabled=true;
+    try{ await call("saveMemo", o); rec.memo=o.memo; rec.status=o.status; rec.pending=false; if(o.status==="退職"){rec.retired=true; if(o.retireDate) rec.retireDate=o.retireDate;} else if(o.status==="在職"){rec.retired=false;} else if(o.status==="退職予定"){rec.retired=false; rec.pending=true; rec.retireDate=o.retireDate;}
+      if(type==="worker"){ rec.newCard=o.newCard; rec.newExpiry=o.newExpiry; if(o.newExpiry){ if(!rec.expiryUpdated) rec.origExpiry=rec.expiry; rec.expiry=o.newExpiry; rec.expiryUpdated=true; } else if(rec.expiryUpdated){ rec.expiry=rec.origExpiry; rec.expiryUpdated=false; } if(o.newCard){ if(!rec.origCardNo) rec.origCardNo=rec.cardNo; rec.cardNo=o.newCard; } }
+      toast("保存しました"); render(); }
+    catch(err){ toast("保存に失敗"); btn.disabled=false; } });
+}
+
+function viewCompanyForm(c){
+  const isNew=!c; c=c||{id:"",name:"",pref:"",city:"",rep:"",store:"",contact:"",tel:"",email:"",field:"",fee:"",memo:""};
+  $("#title").innerHTML=`<span class="brand">受入企業</span>${isNew?"新規登録":"編集"}`;
+  const F=(n,l,t="text")=>`<label>${l}<input name="${n}" type="${t}" value="${esc(c[n])}"></label>`;
+  $("#main").innerHTML=`<div class="card"><form class="f" id="cf">
+    <label>企業名 *<input name="name" required value="${esc(c.name)}"></label>
+    <div class="grid2">${F("pref","都道府県")}${F("city","市区町村")}</div>
+    ${F("store","受入店舗")}${F("rep","代表者/役職")}${F("contact","担当者/役職")}
+    <div class="grid2">${F("tel","連絡先","tel")}${F("field","分野")}</div>
+    ${F("email","メール","email")}${F("fee","支援費(税込)")}
+    <label>メモ<textarea name="memo">${esc(c.memo)}</textarea></label>
+    <div class="btns"><button class="btn primary" type="submit">${isNew?"登録する":"保存する"}</button><button class="btn ghost" type="button" id="cancel">キャンセル</button>
+    ${!isNew?`<button class="btn ghost danger" type="button" id="delC" style="margin-left:auto">企業を削除</button>`:""}</div>
+  </form></div>`;
+  $("#cancel").addEventListener("click", ()=>{ if(isNew) go("#/"); else render(); });
+  $("#cf").addEventListener("submit", async e=>{ e.preventDefault(); const f=new FormData(e.target); const d=Object.assign({},c); for(const [k,v] of f.entries()) d[k]=String(v).trim(); d.staff=staff; if(!d.staff){ toast("先に担当者を選んでください"); openStaff(true); return; }
+    const btn=e.target.querySelector("button"); btn.disabled=true;
+    try{ const id=await call("saveCompany", d); d.id=id; d.src="own"; d.category="追加"; S.companies[id]=d; toast(isNew?"登録しました":"保存しました"); go(`#/c/${encodeURIComponent(id)}`); render(); }
+    catch(err){ toast("保存に失敗"); btn.disabled=false; } });
+  const dc=$("#delC"); if(dc) dc.addEventListener("click", async ()=>{ if(workersOf(c.id).length){ alert("所属の外国人がいる企業は削除できません"); return; } if(confirm(`「${c.name}」を削除しますか？`)){ await call("deleteOwn","company",c.id); delete S.companies[c.id]; go("#/"); } });
+}
+
+function viewWorker(id){
+  const w=S.workers[id]; if(!w){ $("#main").innerHTML=`<div class="empty">見つかりません</div>`; return; }
+  const c=S.companies[w.cid]||{name:"(企業未設定)"};
+  $("#title").innerHTML=`<span class="brand">${esc(c.name)}</span>${esc(w.name)}`;
+  const n=exDays(w);
+  $("#main").innerHTML=`
+    <div class="hero"><div class="wphoto" id="wphoto"></div><h2>${esc(w.name)}</h2><div class="sub">${esc([w.kana,w.nationality,w.gender,w.age?w.age+"歳":""].filter(Boolean).join(" · "))}</div>
+      <div class="pills">${followPill(w.follow)}${w.retired?`<span class="pill ret">退職${w.retireDate?" "+esc(w.retireDate):""}</span>`:w.pending?`<span class="pill warn">退職予定${w.retireDate?" "+esc(w.retireDate):""}</span>`:`<span class="pill ok">在職中</span>`}${w.jp?`<span class="pill acc">${esc(w.jp)}</span>`:""}${applying(w)&&!w.retired?'<span class="pill acc">申請中</span>':""}${n!==null&&!w.retired?(n<0?`<span class="pill crit">在留期限切れ</span>`:n<=90?`<span class="pill warn">在留期限まで${n}日</span>`:w.expiryUpdated?`<span class="pill ok">期限更新済（こちら入力）</span>`:""):""}</div>
+      <div class="btns">${telBtn(w.tel)}<button class="btn" id="editW">${w.src==="own"?"情報を編集":"補足メモ・状態"}</button><button class="btn" data-go="#/c/${encodeURIComponent(w.cid)}">企業ページへ</button></div>
+    </div>
+    ${flagSection("worker", w)}
+    <section class="sec"><div class="sec-h"><h2>基本情報${w.src==="ref"?"（Linola表より・参照のみ）":""}</h2></div><div class="card">
+      ${kv("受入企業",c.name)}${kv("国籍",w.nationality)}${kv("送出機関",w.agency)}${kv("分野",w.field)}${kv("生年月日",w.birth,true)}${kv("日本語",w.jp)}${kv("電話",w.tel,true)}${kv("住所",w.address)}
+    </div></section>
+    <section class="sec"><div class="sec-h"><h2>在留・申請</h2></div><div class="card">
+      ${kv("在留カード",w.cardNo+(w.origCardNo?"\n（Linola表: "+w.origCardNo+"）":""),true)}${kv("有効期限",w.expiry+(w.expiryUpdated?"\n（Linola表: "+(w.origExpiry||"—")+"）":""),true)}${kv("入国日",w.entry,true)}${kv("申請日",w.applyDate,true)}${kv("申請番号",w.applyNo,true)}${kv("支援費",w.fee,true)}${kv("補足メモ",w.memo)}
+    </div></section>
+    ${logSection("worker", l=>l.wid===id, w)}`;
+  wire(); wireLogs({type:"worker", cid:w.cid, cname:c.name, wid:id, wname:w.name}, w); wireFlags("worker", w);
+  $("#editW").addEventListener("click", ()=> w.src==="own" ? viewWorkerForm(w, w.cid) : viewMemoForm(w,"worker"));
+  const ph=$("#wphoto"); const PH_TTL=5*60*1000; S.photos=S.photos||{};
+  if(w.src==="ref" && w.category){ const c0=S.photos[id];
+    if(c0 && Date.now()-c0.t<PH_TTL){ ph.innerHTML=`<img src="${esc(c0.u)}" alt="" onerror="this.parentNode.textContent='再読込で表示'">`; }
+    else { ph.textContent="…"; call("getPhoto",{sheet:w.category,name:w.name,birth:w.birth}).then(u=>{ if(u){ S.photos[id]={u,t:Date.now()}; } const el=$("#wphoto"); if(el && route().id===id) el.innerHTML = u ? `<img src="${esc(u)}" alt="">` : `<span>写真なし</span>`; }).catch(()=>{ const el=$("#wphoto"); if(el) el.innerHTML=`<span>—</span>`; }); }
+  } else ph.innerHTML=`<span>写真なし</span>`;
+}
+
+function viewWorkerForm(w, cid){
+  const isNew=!w; w=w||{id:"",cid:cid,name:"",kana:"",nationality:"",gender:"",birth:"",jp:"",agency:"",field:"",entry:"",cardNo:"",expiry:"",address:"",tel:"",retired:false,retireDate:"",memo:""};
+  $("#title").innerHTML=`<span class="brand">外国人</span>${isNew?"新規登録":"編集"}`;
+  const F=(n,l,t="text")=>`<label>${l}<input name="${n}" type="${t}" value="${esc(w[n])}"></label>`;
+  const cos=Object.values(S.companies).sort((a,b)=>a.name.localeCompare(b.name,"ja"));
+  $("#main").innerHTML=`<div class="card"><form class="f" id="wf">
+    <label>受入企業 *<select name="cid" required>${cos.map(c=>`<option value="${esc(c.id)}" ${c.id===w.cid?"selected":""}>${esc(c.name)}</option>`).join("")}</select></label>
+    <div class="grid2"><label>氏名 *<input name="name" required value="${esc(w.name)}"></label>${F("kana","フリガナ")}</div>
+    <div class="grid3">${F("nationality","国籍")}${F("gender","性別")}${F("jp","日本語")}</div>
+    <div class="grid3">${F("birth","生年月日")}${F("agency","送出機関")}${F("field","分野")}</div>
+    ${F("tel","電話","tel")}${F("address","住所")}
+    <div class="grid2">${F("cardNo","在留カード")}${F("expiry","有効期限")}</div>
+    ${F("entry","入国日")}
+    <div class="grid2"><label>状態<select name="retired"><option value="0" ${!w.retired?"selected":""}>在職中</option><option value="1" ${w.retired?"selected":""}>退職</option></select></label>${F("retireDate","退職日")}</div>
+    <label>メモ<textarea name="memo">${esc(w.memo)}</textarea></label>
+    <div class="btns"><button class="btn primary" type="submit">${isNew?"登録する":"保存する"}</button><button class="btn ghost" type="button" id="cancel">キャンセル</button>
+    ${!isNew?`<button class="btn ghost danger" type="button" id="delW" style="margin-left:auto">削除</button>`:""}</div>
+  </form></div>`;
+  $("#cancel").addEventListener("click", ()=>{ if(isNew) go(`#/c/${encodeURIComponent(cid)}`); else render(); });
+  $("#wf").addEventListener("submit", async e=>{ e.preventDefault(); const f=new FormData(e.target); const d=Object.assign({},w); for(const [k,v] of f.entries()) d[k]=String(v).trim(); d.retired = d.retired==="1"; d.staff=staff; if(!d.staff){ toast("先に担当者を選んでください"); openStaff(true); return; }
+    const btn=e.target.querySelector("button"); btn.disabled=true;
+    try{ const id=await call("saveWorker", d); d.id=id; d.src="own"; d.category="追加"; S.workers[id]=d; toast(isNew?"登録しました":"保存しました"); go(`#/w/${encodeURIComponent(id)}`); render(); }
+    catch(err){ toast("保存に失敗"); btn.disabled=false; } });
+  const dw=$("#delW"); if(dw) dw.addEventListener("click", async ()=>{ if(confirm(`「${w.name}」を削除しますか？（履歴は残ります）`)){ await call("deleteOwn","worker",w.id); delete S.workers[w.id]; go(`#/c/${encodeURIComponent(w.cid)}`); } });
+}
+
+// ---------- 入国前（内定後）案件 ----------
+const fmtD = d => `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,"0")}/${String(d.getDate()).padStart(2,"0")}`;
+function preDue(p, i){
+  const st=(p.steps||[])[i]||{}; if(st.due) return st.due;
+  const rule=String((S.preSteps[i]||{}).due||""); const d=parseDate(p.offerDate); if(!d) return "";
+  const m=rule.match(/^翌+月(\d+)$/); if(m) return fmtD(new Date(d.getFullYear(), d.getMonth()+1, +m[1]));
+  const n=parseInt(rule,10); if(isNaN(n)) return ""; return fmtD(new Date(d.getFullYear(), d.getMonth(), d.getDate()+n));
+}
+const CLOSED = {"完了":1,"中止":1,"入国済":1};
+function preInfo(p){
+  const steps=S.preSteps.map((s,i)=>{ const st=(p.steps||[])[i]||{}; const due=preDue(p,i); const days=st.done?null:daysTo(due); const checks=(s.subs||[]).map((_,j)=>!!(st.checks||[])[j]); return Object.assign({}, s, {i, done:st.done||"", due, days, memo:st.memo||"", checks, nChk:checks.filter(Boolean).length}); });
+  const doneN=steps.filter(s=>s.done).length; const next=steps.find(s=>!s.done)||null;
+  const open = !CLOSED[p.status];
+  const overdue = open && steps.some(s=>!s.done && s.days!==null && s.days<0);
+  const soon = open && !overdue && steps.some(s=>!s.done && s.days!==null && s.days<=7);
+  const minDays = open ? Math.min(...steps.filter(s=>!s.done&&s.days!==null).map(s=>s.days), 1e9) : 1e9;
+  return {steps, doneN, next, open, overdue, soon, minDays};
+}
+const duePill = (s) => { if(s.done) return `<span class="pill ok">済 ${esc(s.done)}</span>`; if(s.days===null) return `<span class="pill ret">期限未設定</span>`; const t = s.days<0?`超過${-s.days}日`:s.days===0?"今日まで":`あと${s.days}日`; const cls = s.days<0?"crit":s.days<=7?"warn":"acc"; return `<span class="pill ${cls}">${esc(s.due)} ${t}</span>`; };
+const statusPill = p => p.status==="入国済"?`<span class="pill ok">入国済</span>`:`<span class="pill ret">${esc(p.status)}</span>`;
+let filtP = {q:"", only:"open"};
+function viewPre(){
+  $("#title").innerHTML=`<span class="brand">Linola 特定技能</span>入国前（内定後）`;
+  const all=Object.values(S.pre||{}); const infos=all.map(preInfo); const cands=S.preCands||[];
+  const nOpen=infos.filter(x=>x.open).length, nOver=infos.filter(x=>x.overdue).length, nSoon=infos.filter(x=>x.soon).length;
+  $("#main").innerHTML=`
+    <div class="summary">
+      <div class="tile"><b>${nOpen}</b><span>進行中</span></div>
+      <div class="tile ${nOver?"crit":""}"><b>${nOver}</b><span>期限超過</span></div>
+      <div class="tile ${nSoon?"warn":""}"><b>${nSoon}</b><span>7日以内</span></div>
+      <div class="tile ${cands.length?"warn":""}"><b>${cands.length}</b><span>未登録候補</span></div>
+    </div>
+    ${cands.length?`<section class="sec" style="margin-top:0"><div class="sec-h"><h2>Linola表にいる入国前の人（まだ案件なし）</h2><button class="act" id="candTog">${filtP.hideC?"表示":"隠す"}</button></div>
+      <div class="list" ${filtP.hideC?"hidden":""}>${cands.map(c=>`<button class="row" data-go="#/newpre/${encodeURIComponent(c.wid)}"><div class="body"><div class="t">${esc(c.cname)}</div><div class="s">${esc(c.name)}${c.firstSeen?" · 表に出現 "+esc(c.firstSeen):""}${c.category?" · "+esc(c.category):""}</div></div><div class="n" style="color:var(--accent);font-weight:600">案件にする ›</div></button>`).join("")}</div>
+      <div class="empty" style="font-size:11.5px;padding:4px 0 0;text-align:left">在留カード・入国日が空の人を自動で拾っています。タップすると内定日（表に出現した日）入りで登録画面が開きます。</div></section>`:""}
+    <div class="search" style="margin-top:12px"><input id="pq" type="search" placeholder="企業名・外国人名で検索" value="${esc(filtP.q)}" autocomplete="off"></div>
+    <div class="chips">${[["open","進行中"],["over","期限超過"],["soon","7日以内"],["us","弊社の番"],["co","企業の番"],["entered","入国済"],["done","完了・中止"],["all","すべて"]].map(([k,l])=>`<button class="chip ${filtP.only===k?"on":""}" data-ponly="${k}">${l}</button>`).join("")}</div>
+    <div class="empty" style="font-size:11.5px;padding:0 0 6px">流れ：${S.preSteps.map((s,i)=>`${i+1}.${esc(s.name)}（${esc(s.who)}）`).join(" → ")} → 入国（Linola表に入国日が入ると自動で「入国済」）</div>
+    <div class="list" id="plist"></div>
+    <div class="empty" style="font-size:12px">期限は内定日からの日数で自動計算（設定シートで変更可・案件ごとに上書き可）。</div>
+    <button class="fab" data-go="#/newpre">＋ 内定案件を追加</button>`;
+  preList();
+  const qi=$("#pq"); let composing=false;
+  qi.addEventListener("compositionstart", ()=>{ composing=true; });
+  qi.addEventListener("compositionend", e=>{ composing=false; filtP.q=e.target.value; preList(); });
+  qi.addEventListener("input", e=>{ if(composing) return; filtP.q=e.target.value; preList(); });
+  document.querySelectorAll("[data-ponly]").forEach(b=>b.addEventListener("click", ()=>{ filtP.only=b.dataset.ponly; document.querySelectorAll("[data-ponly]").forEach(c=>c.classList.toggle("on", c.dataset.ponly===filtP.only)); preList(); }));
+  const ct=$("#candTog"); if(ct) ct.addEventListener("click", ()=>{ filtP.hideC=!filtP.hideC; viewPre(); });
+  wire();
+}
+function preList(){
+  const el=$("#plist"); if(!el) return; const q=filtP.q.trim().toLowerCase();
+  let rows=Object.values(S.pre||{}).map(p=>({p, x:preInfo(p)})).filter(({p,x})=>{
+    const o=filtP.only;
+    if(o==="open" && !x.open) return false;
+    if(o==="over" && !x.overdue) return false;
+    if(o==="soon" && !(x.overdue||x.soon)) return false;
+    if(o==="us" && !(x.open && x.next && x.next.who==="弊社")) return false;
+    if(o==="co" && !(x.open && x.next && x.next.who==="企業")) return false;
+    if(o==="entered" && p.status!=="入国済") return false;
+    if(o==="done" && (x.open || p.status==="入国済")) return false;
+    if(q && !((p.cname||"")+" "+(p.wnames||"")).toLowerCase().includes(q)) return false;
+    return true;
+  });
+  rows.sort((a,b)=> (b.x.open-a.x.open) || (a.x.minDays-b.x.minDays) || (b.p.offerDate||"").localeCompare(a.p.offerDate||""));
+  el.innerHTML = rows.map(({p,x})=>{ const nx=x.next; const st = !x.open ? statusPill(p) : nx ? duePill(nx) : `<span class="pill ok">全工程完了・入国待ち</span>`;
+    return `<button class="row" data-go="#/prec/${encodeURIComponent(p.id)}"><div class="body"><div class="t">${esc(p.cname)} ${st}${p.mismatch?`<span class="pill warn">表と企業が違う</span>`:""}</div><div class="s">${esc(p.wnames||"（外国人未入力）")} · 内定 ${esc(p.offerDate||"—")}${nx&&x.open?` · 次：${esc(nx.name)}（${esc(nx.who)}）`:""}</div></div><div class="n"><b>${x.doneN}</b>/${x.steps.length}</div></button>`; }).join("") || `<div class="empty">該当する案件がありません</div>`;
+  el.querySelectorAll("[data-go]").forEach(b=>b.addEventListener("click", ()=>go(b.dataset.go)));
+}
+function viewPreForm(p, cand){
+  const isNew=!p; p=p||{id:"",cid:cand?cand.cid:"",cname:cand?cand.cname:"",wnames:cand?cand.name:"",wids:cand?cand.wid:"",offerDate:(cand&&cand.firstSeen)||today().replace(/-/g,"/"),status:"進行中",note:"",steps:[],src:cand?"自動":"手動"};
+  $("#title").innerHTML=`<span class="brand">入国前</span>${isNew?"内定案件を追加":"案件を編集"}`;
+  const cos=Object.values(S.companies).sort((a,b)=>a.name.localeCompare(b.name,"ja"));
+  $("#main").innerHTML=`${cand?`<div class="banner info">Linola表から拾った人です。内定日は「表に初めて出た日」を仮で入れています。違えば直してください。</div>`:""}<div class="card"><form class="f" id="pf">
+    <label>受入企業 *<select name="cid" required><option value="">選択してください</option>${cos.map(c=>`<option value="${esc(c.id)}" ${c.id===p.cid?"selected":""}>${esc(c.name)}</option>`).join("")}</select></label>
+    <label>内定した外国人（複数は「、」区切り）<input name="wnames" value="${esc(p.wnames)}" placeholder="例：AUNG MYO MIN、NAING MIN THANT"></label>
+    <div class="grid2"><label>内定日 *<input name="offerDate" type="date" value="${toISO(p.offerDate)}" required></label><label>状態<select name="status">${["進行中","完了","入国済","中止"].map(s=>`<option ${p.status===s?"selected":""}>${s}</option>`).join("")}</select></label></div>
+    <label>備考<textarea name="note">${esc(p.note)}</textarea></label>
+    <div class="btns"><button class="btn primary" type="submit">${isNew?"登録する":"保存する"}</button><button class="btn ghost" type="button" id="cancel">キャンセル</button></div>
+  </form></div>`;
+  $("#cancel").addEventListener("click", ()=>{ if(isNew) go("#/pre"); else render(); });
+  $("#pf").addEventListener("submit", async e=>{ e.preventDefault(); const f=new FormData(e.target); const st=staff; if(!st){ toast("先に担当者を選んでください"); openStaff(true); return; }
+    const cid=f.get("cid"); const c=S.companies[cid]; if(!c){ toast("企業を選んでください"); return; }
+    const d=Object.assign({}, p, {cid, cname:c.name, wnames:(f.get("wnames")||"").trim(), offerDate:(f.get("offerDate")||"").replace(/-/g,"/"), status:f.get("status")||"進行中", note:(f.get("note")||"").trim(), staff:st});
+    const btn=e.target.querySelector("button"); btn.disabled=true;
+    try{ const id=await call("savePre", d); d.id=id; d.steps=d.steps&&d.steps.length?d.steps:S.preSteps.map(s=>({done:"",due:"",checks:s.subs.map(()=>false),memo:""})); S.pre[id]=d; if(cand) S.preCands=(S.preCands||[]).filter(x=>x.wid!==cand.wid); cachePre(); toast(isNew?"登録しました":"保存しました"); go(`#/prec/${encodeURIComponent(id)}`); render(); }
+    catch(err){ toast("保存に失敗"); btn.disabled=false; } });
+}
+function cachePre(){ try{ const c=JSON.parse(localStorage.getItem("linola.cache")||"null"); if(c){ c.pre=Object.values(S.pre); c.preCands=S.preCands||[]; localStorage.setItem("linola.cache", JSON.stringify(c)); } }catch(_){} }
+function viewPreCase(id){
+  const p=S.pre[id]; if(!p){ $("#main").innerHTML=`<div class="empty">案件が見つかりません</div>`; return; }
+  const x=preInfo(p); const c=S.companies[p.cid];
+  $("#title").innerHTML=`<span class="brand">入国前</span>${esc(p.cname)}`;
+  $("#main").innerHTML=`
+    <div class="hero"><h2>${esc(p.cname)}</h2><div class="sub">${esc(p.wnames||"（外国人未入力）")} · 内定 ${esc(p.offerDate||"—")}${p.src==="自動"?" · Linola表から":""}</div>
+      <div class="pills">${!x.open?statusPill(p):x.next?duePill(x.next):`<span class="pill ok">全工程完了・入国待ち</span>`}<span class="pill acc">${x.doneN}/${x.steps.length} 工程</span>${x.next&&x.open?`<span class="pill ${x.next.who==="企業"?"warn":"acc"}">次は${esc(x.next.who)}：${esc(x.next.name)}</span>`:""}${p.mismatch?`<span class="pill warn">Linola表では ${esc(p.mismatch)}</span>`:""}</div>
+      <div class="btns">${c?`<button class="btn" data-go="#/c/${encodeURIComponent(p.cid)}">企業ページへ</button>`:""}<button class="btn" id="editP">案件情報を編集</button></div>
+    </div>
+    <section class="sec"><div class="sec-h"><h2>工程チェック（項目を全部チェックすると工程が完了になる）</h2></div><div class="card">
+      ${x.steps.map(s=>`<div class="pstep ${s.done?"done":""}" data-i="${s.i}">
+        <div class="ph"><div class="pchk ${s.done?"on":""}" id="pc${s.i}">${s.done?"✓":s.nChk+"/"+s.checks.length}</div><div class="pt"><b>${s.i+1}. ${esc(s.name)}</b><span class="pill ${s.who==="企業"?"warn":"acc"}">${esc(s.who)}</span></div><div class="pd" id="pd${s.i}">${duePill(s)}</div></div>
+        <div class="subs">${(s.subs||[]).map((t,j)=>`<label class="sub"><input type="checkbox" data-sub="${s.i}:${j}" ${s.checks[j]?"checked":""}> ${esc(t)}</label>`).join("")}</div>
+        <div class="pb"><label>期限<input type="date" data-due="${s.i}" value="${toISO(s.due)}"></label><label>メモ<input data-memo="${s.i}" value="${esc(s.memo)}" placeholder="例：請求書 9/30 送付済"></label></div>
+      </div>`).join("")}
+      <div class="btns" style="padding-bottom:10px"><button class="btn primary" id="saveSteps">チェックを保存</button><span class="empty" style="padding:0;font-size:12px">期限を空にすると自動計算に戻る</span></div>
+    </div></section>
+    ${p.note?`<section class="sec"><div class="sec-h"><h2>備考</h2></div><div class="card">${kv("備考",p.note)}</div></section>`:""}
+    <div class="btns"><button class="btn ghost danger" id="delP">この案件を削除</button></div>`;
+  wire();
+  const steps=x.steps.map(s=>({done:s.done, due:(p.steps||[])[s.i]&&(p.steps||[])[s.i].due||"", checks:s.checks.slice(), memo:s.memo}));
+  const refresh=i=>{ const st=steps[i]; const all=st.checks.length&&st.checks.every(Boolean); st.done = all ? (st.done||today().replace(/-/g,"/")) : ""; const pc=$("#pc"+i); pc.classList.toggle("on", !!st.done); pc.textContent=st.done?"✓":st.checks.filter(Boolean).length+"/"+st.checks.length; pc.closest(".pstep").classList.toggle("done", !!st.done); };
+  document.querySelectorAll("[data-sub]").forEach(cb=>cb.addEventListener("change", ()=>{ const [i,j]=cb.dataset.sub.split(":").map(Number); steps[i].checks[j]=cb.checked; refresh(i); }));
+  const save=async ()=>{ const st=staff; if(!st){ toast("先に担当者を選んでください"); openStaff(true); return; }
+    document.querySelectorAll("[data-due]").forEach(i=>{ steps[+i.dataset.due].due=(i.value||"").replace(/-/g,"/"); });
+    document.querySelectorAll("[data-memo]").forEach(i=>{ steps[+i.dataset.memo].memo=i.value.trim(); });
+    const allDone=steps.every(s=>s.done); let status=p.status; if(status==="進行中" && allDone) status="完了"; else if(status==="完了" && !allDone) status="進行中";
+    const d=Object.assign({}, p, {steps, staff:st, status});
+    const btn=$("#saveSteps"); btn.disabled=true; btn.textContent="保存中…";
+    try{ await call("savePre", d); Object.assign(p, d); cachePre(); toast(allDone?"全工程完了（入国待ち）":"保存しました"); render(); }catch(err){ toast("保存に失敗"); btn.disabled=false; btn.textContent="チェックを保存"; } };
+  $("#saveSteps").addEventListener("click", save);
+  $("#editP").addEventListener("click", ()=>viewPreForm(p));
+  $("#delP").addEventListener("click", async ()=>{ if(!confirm(`「${p.cname}」の内定案件を削除しますか？`)) return; try{ await call("deletePre", p.id); delete S.pre[p.id]; cachePre(); go("#/pre"); }catch(_){ toast("削除に失敗"); } });
+}
+function syncTabs(view){ const isPre = view==="pre"||view==="prec"||view==="newpre"; document.querySelectorAll("[data-tab]").forEach(b=>b.classList.toggle("on", (b.dataset.tab==="pre")===isPre)); }
+document.querySelectorAll("[data-tab]").forEach(b=>b.addEventListener("click", ()=>go(b.dataset.tab==="pre"?"#/pre":"#/")));
+
+// 顔写真タップで拡大表示
+document.addEventListener("click", e=>{ const im=e.target.closest(".wphoto img"); if(!im) return; const lb=document.createElement("div"); lb.className="lb"; const big=document.createElement("img"); big.src=im.src; big.alt=""; lb.appendChild(big); lb.addEventListener("click", ()=>lb.remove()); document.body.appendChild(lb); });
+render(); load(false);
+})();
+</script>
+
+</body>
+</html>
