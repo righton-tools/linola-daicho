@@ -573,10 +573,10 @@ function viewWorker(id){
     ${logSection("worker", l=>l.wid===id, w)}`;
   wire(); wireLogs({type:"worker", cid:w.cid, cname:c.name, wid:id, wname:w.name}, w); wireFlags("worker", w);
   $("#editW").addEventListener("click", ()=> w.src==="own" ? viewWorkerForm(w, w.cid) : viewMemoForm(w,"worker"));
-  const ph=$("#wphoto"); const PH_TTL=5*60*1000; S.photos=S.photos||{};
+  const ph=$("#wphoto"); const PH_TTL=6*60*60*1000; S.photos=S.photos||{};
   if(w.src==="ref" && w.category){ const c0=S.photos[id];
     if(c0 && Date.now()-c0.t<PH_TTL){ ph.innerHTML=`<img src="${esc(c0.u)}" alt="" onerror="this.parentNode.textContent='再読込で表示'">`; }
-    else { ph.textContent="…"; call("getPhoto",{sheet:w.category,name:w.name,birth:w.birth}).then(u=>{ if(u){ S.photos[id]={u,t:Date.now()}; } const el=$("#wphoto"); if(el && route().id===id) el.innerHTML = u ? `<img src="${esc(u)}" alt="">` : `<span>写真なし</span>`; }).catch(()=>{ const el=$("#wphoto"); if(el) el.innerHTML=`<span>—</span>`; }); }
+    else { ph.textContent="…"; call("getPhoto",{sheet:w.category,name:w.name,birth:w.birth}).then(u=>{ if(u){ S.photos[id]={u,t:Date.now()}; } const el=$("#wphoto"); if(el && route().id===id) el.innerHTML = u ? `<img src="${esc(u)}" alt="" onerror="this.parentNode.textContent='写真を表示できません'">` : `<span>写真なし</span>`; }).catch(()=>{ const el=$("#wphoto"); if(el) el.innerHTML=`<span>取得エラー</span>`; }); }
   } else ph.innerHTML=`<span>写真なし</span>`;
 }
 
