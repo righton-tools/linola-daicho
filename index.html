@@ -82,6 +82,10 @@ a{color:var(--accent);text-decoration:none}
 .row:active{border-color:var(--accent)}
 .row .body{flex:1;min-width:0}
 .row .t{font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* 名前が長くても注意ピルが「…」で隠れないよう、名前だけを省略しピルは必ず表示 */
+.row .t{display:flex;align-items:center;gap:6px}
+.row .t .nm{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.row .t .pill{flex:none}
 .row .s{font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
 .row .n{font-variant-numeric:tabular-nums;font-size:13px;color:var(--ink2);text-align:right;flex:none}
 .row .n b{display:block;font-size:18px;color:var(--ink)}
@@ -377,7 +381,7 @@ function homeList(){
   });
   if(has("follow")||has("due")) rows.sort((a,b)=>{ const fa=fmap[a.id], fb=fmap[b.id]; return ((fa.days??1e9)-(fb.days??1e9)) || (fb.level-fa.level); });
   el.innerHTML = rows.map(c=>{ const ws=workersOf(c.id); const act=ws.filter(w=>!w.retired).length; const wl=lastLog(l=>l.cid===c.id); const hasExp=ws.some(w=>{const n=exDays(w); return !w.retired&&n!==null&&n<0;}); const hasWarn=!hasExp&&ws.some(w=>{const n=exDays(w); return !w.retired&&n!==null&&n<=90;});
-        return `<button class="row" data-go="#/c/${encodeURIComponent(c.id)}"><div class="body"><div class="t">${esc(c.name)} ${followPill(fmap[c.id])}${flagPill("company",c.id)}${hasExp?'<span class="pill crit">期限切れ</span>':hasWarn?'<span class="pill warn">期限注意</span>':""}${c.src==="own"?'<span class="pill acc">追加</span>':""}</div><div class="s">${esc([c.pref,c.city].filter(Boolean).join(" "))}${c.store?" · "+esc(c.store):""}${wl?" · 最終対応 "+esc(wl.date):""}</div></div><div class="n"><b>${act}</b>名${ws.length-act?`<span style="color:var(--muted)">/退${ws.length-act}</span>`:""}</div></button>`; }).join("") || `<div class="empty">該当する企業がありません</div>`;
+        return `<button class="row" data-go="#/c/${encodeURIComponent(c.id)}"><div class="body"><div class="t"><span class="nm">${esc(c.name)}</span>${followPill(fmap[c.id])}${flagPill("company",c.id)}${hasExp?'<span class="pill crit">期限切れ</span>':hasWarn?'<span class="pill warn">期限注意</span>':""}${c.src==="own"?'<span class="pill acc">追加</span>':""}</div><div class="s">${esc([c.pref,c.city].filter(Boolean).join(" "))}${c.store?" · "+esc(c.store):""}${wl?" · 最終対応 "+esc(wl.date):""}</div></div><div class="n"><b>${act}</b>名${ws.length-act?`<span style="color:var(--muted)">/退${ws.length-act}</span>`:""}</div></button>`; }).join("") || `<div class="empty">該当する企業がありません</div>`;
   el.querySelectorAll("[data-go]").forEach(b=>b.addEventListener("click", ()=>go(b.dataset.go)));
 }
 
@@ -438,7 +442,7 @@ function viewCompany(id){
   const c=S.companies[id]; if(!c){ $("#main").innerHTML=`<div class="empty">企業が見つかりません</div>`; return; }
   $("#title").innerHTML=`<span class="brand">受入企業</span>${esc(c.name)}`;
   const ws=workersOf(id); const act=ws.filter(w=>!w.retired), ret=ws.filter(w=>w.retired);
-  const wrow = w => `<button class="row" data-go="#/w/${encodeURIComponent(w.id)}"><div class="body"><div class="t">${esc(w.name)} ${followPill(w.follow)}${flagPill("worker",w.id)}${expiryPill(w)}</div><div class="s">${esc([w.kana,w.nationality,w.jp].filter(Boolean).join(" · "))}${w.entry?" · 入国 "+esc(w.entry):""}</div></div><div class="n">›</div></button>`;
+  const wrow = w => `<button class="row" data-go="#/w/${encodeURIComponent(w.id)}"><div class="body"><div class="t"><span class="nm">${esc(w.name)}</span>${followPill(w.follow)}${flagPill("worker",w.id)}${expiryPill(w)}</div><div class="s">${esc([w.kana,w.nationality,w.jp].filter(Boolean).join(" · "))}${w.entry?" · 入国 "+esc(w.entry):""}</div></div><div class="n">›</div></button>`;
   $("#main").innerHTML = `
     <div class="hero"><h2>${esc(c.name)}</h2><div class="sub">${esc([c.pref,c.city].filter(Boolean).join(" "))}${c.field?" · "+esc(c.field):""}${c.category?" · "+esc(c.category):""}</div>
       <div class="pills">${followPill(c.follow)}<span class="pill acc">在職 ${act.length}名</span>${ret.length?`<span class="pill ret">退職 ${ret.length}名</span>`:""}${c.fee?`<span class="pill ok">支援費 ${esc(c.fee)}</span>`:""}</div>
