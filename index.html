@@ -147,6 +147,9 @@ form.f{display:flex;flex-direction:column;gap:10px;padding:12px 0}
 .log .when{flex:none;width:74px;font-family:var(--mono);font-size:12px;color:var(--muted);line-height:1.5;padding-top:2px}
 .log .who{font-size:12px;color:var(--ink2);margin-bottom:2px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .log .txt{white-space:pre-wrap;font-size:14px}
+.log .txt.clamp{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.log .more{background:none;border:0;color:var(--accent);font-size:12px;padding:2px 0 0;cursor:pointer;display:none}
+.log .more.show{display:inline-block}
 .log .del{margin-left:auto;background:none;border:0;color:var(--muted);font-size:12px;cursor:pointer;padding:0}
 .empty{color:var(--muted);font-size:13.5px;padding:14px 0;text-align:center}
 .fab{position:fixed;right:16px;bottom:18px;z-index:6;background:var(--accent);color:var(--accent-ink);border:0;border-radius:999px;padding:12px 18px;font-size:14px;font-weight:700;box-shadow:var(--shadow);cursor:pointer}
@@ -411,10 +414,12 @@ function logSection(scope, pred, rec){
       </form>
     </div>
     <div class="card" style="margin-top:8px">
-      ${logs.map(l=>`<div class="log"><div class="when">${esc(l.date)}</div><div style="flex:1;min-width:0"><div class="who"><span class="kindtag">${esc(l.kind||"")}</span>${esc(l.staff||"")}${scope==="company"&&l.wid?`<span class="pill acc">${esc(l.wname||"")}</span>`:""}<button class="del" data-del="${esc(l.id)}">削除</button></div><div class="txt">${esc(l.text)}</div></div></div>`).join("") || `<div class="empty">まだ履歴がありません</div>`}
+      ${logs.map(l=>`<div class="log"><div class="when">${esc(l.date)}</div><div style="flex:1;min-width:0"><div class="who"><span class="kindtag">${esc(l.kind||"")}</span>${esc(l.staff||"")}${scope==="company"&&l.wid?`<span class="pill acc">${esc(l.wname||"")}</span>`:""}<button class="del" data-del="${esc(l.id)}">削除</button></div><div class="txt clamp">${esc(l.text)}</div><button class="more" type="button">もっと見る</button></div></div>`).join("") || `<div class="empty">まだ履歴がありません</div>`}
     </div></section>`;
 }
 function wireLogs(base, rec){
+  // 履歴の本文は先頭3行だけ表示。長いものは「もっと見る」で開閉（本文タップでも開閉）
+  document.querySelectorAll(".log .txt.clamp").forEach(t=>{ const b=t.nextElementSibling; if(!b) return; if(t.scrollHeight>t.clientHeight+2){ b.classList.add("show"); const tog=()=>{ const c=t.classList.toggle("clamp"); b.textContent=c?"もっと見る":"閉じる"; }; b.addEventListener("click", tog); t.addEventListener("click", tog); } });
   $("#fopen").addEventListener("change", e=>{ $("#fopts").hidden=!e.target.checked; });
   $("#logForm").addEventListener("submit", async e=>{
     e.preventDefault(); const f=new FormData(e.target); const st=staff;
