@@ -63,6 +63,16 @@ a{color:var(--accent);text-decoration:none}
 .main{padding:14px 14px 90px;flex:1}
 .banner{background:var(--warn-soft);color:var(--warn);border-radius:10px;padding:9px 12px;font-size:13px;margin-bottom:12px}
 .banner.info{background:var(--accent-soft);color:var(--accent)}
+.newsbar{display:flex;align-items:center;gap:8px;width:100%;border:0;border-radius:12px;padding:11px 14px;margin-bottom:10px;background:var(--crit);color:#fff;font-size:14px;font-weight:700;cursor:pointer;text-align:left;font-family:inherit}
+.newsbar .go{margin-left:auto;font-weight:500;font-size:12px;opacity:.9}
+.pill.new{background:var(--crit);color:#fff}
+.nitem{padding:9px 0;border-bottom:1px solid var(--line)}
+.nitem:last-child{border-bottom:0}
+.nitem a{color:var(--text);text-decoration:none;font-size:14px;line-height:1.45;display:block}
+.nitem a:active{opacity:.7}
+.nm2{font-size:11.5px;color:var(--muted);display:flex;gap:6px;align-items:center;margin-bottom:3px}
+.tabs button{position:relative}
+#newsBdg{position:absolute;top:-6px;right:-4px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--crit);color:#fff;font-size:11px;font-weight:700;line-height:18px;text-align:center}
 .search{display:flex;gap:8px;margin-bottom:10px}
 .search input{flex:1;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:10px 12px;font-size:16px}
 .chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:8px;-webkit-overflow-scrolling:touch}
@@ -198,7 +208,7 @@ form.f{display:flex;flex-direction:column;gap:10px;padding:12px 0}
     <button class="staff" id="refreshBtn" title="最新に更新" aria-label="最新に更新" type="button">↻</button>
 <button class="staff" id="staffBtn" title="入力者名を設定"><span class="dot" id="dot"></span><span id="staffName">担当者未設定</span></button>
   </header>
-  <nav class="tabs"><button data-tab="home" class="on" type="button">支援台帳</button><button data-tab="pre" type="button">入国前（内定後）</button></nav>
+  <nav class="tabs"><button data-tab="home" class="on" type="button">支援台帳</button><button data-tab="pre" type="button">入国前（内定後）</button><button data-tab="news" type="button">ニュース<span id="newsBdg" hidden></span></button></nav>
 <main class="main" id="main"></main>
 </div>
 <div class="toast" id="toast"></div>
@@ -231,7 +241,7 @@ async function resolveKey(){
 function applyData(d, fromCache){
   S.companies={}; S.workers={}; S.logs={};
   d.companies.forEach(c=>S.companies[c.id]=c); d.workers.forEach(w=>S.workers[w.id]=w); d.logs.forEach(l=>S.logs[l.id]=l);
-  S.refreshedAt=d.refreshedAt; S.fromCache=!!fromCache; S.ready=true; if(!fromCache) S.lastFetch=Date.now(); S.staffList=d.staffList||[]; S.flags=d.flags||[]; S.pre={}; (d.pre||[]).forEach(p=>S.pre[p.id]=p); S.preCands=d.preCands||[]; S.preSteps=d.preSteps||S.preSteps||[];
+  S.refreshedAt=d.refreshedAt; S.fromCache=!!fromCache; S.ready=true; if(!fromCache) S.lastFetch=Date.now(); S.staffList=d.staffList||[]; S.flags=d.flags||[]; S.pre={}; (d.pre||[]).forEach(p=>S.pre[p.id]=p); S.preCands=d.preCands||[]; S.preSteps=d.preSteps||S.preSteps||[]; S.news=d.news||{items:[],seen:{}}; setTimeout(updateNewsBadge,0);
   if(!staff && !S.pickerShown){ S.pickerShown=true; setTimeout(()=>openStaff(true),0); }
 }
 async function load(silent){
@@ -308,16 +318,17 @@ let filt = {q:"", prefs:[], flags:[]};
 function render(){
   $("#staffName").textContent = staff || "担当者未設定";
   const r = route();
-  $("#back").disabled = r.view==="home"||r.view==="pre"; syncTabs(r.view);
+  $("#back").disabled = r.view==="home"||r.view==="pre"||r.view==="news"; syncTabs(r.view);
   if(!S.ready){ $("#main").innerHTML=`<div class="empty">読み込み中…</div>`; $("#title").innerHTML=`<span class="brand">Linola 特定技能</span>支援台帳`; return; }
-  if(r.view==="pre") return viewPre();
+  if(r.view==="news") return viewNews();
+  if(r.view==="pre"){ viewPre(); injectNewsBar(); return; }
   if(r.view==="prec") return viewPreCase(r.id);
   if(r.view==="newpre") return viewPreForm(null, r.id? (S.preCands||[]).find(c=>c.wid===r.id) : null);
   if(r.view==="c") return viewCompany(r.id);
   if(r.view==="w") return viewWorker(r.id);
   if(r.view==="newcompany") return viewCompanyForm(null);
   if(r.view==="newworker") return viewWorkerForm(null, r.id);
-  return viewHome();
+  viewHome(); injectNewsBar();
 }
 
 function viewHome(){
@@ -513,6 +524,29 @@ function viewFlagForm(type, rec){
     const btn=e.target.querySelector("button"); btn.disabled=true;
     try{ const id=await call("addFlag", o); S.flags=S.flags||[]; S.flags.push(Object.assign({id, createdAt:new Date().toISOString()}, o)); toast("保存しました"); render(); }catch(err){ toast("保存に失敗: "+(err.message||err)); btn.disabled=false; }
   });
+}
+
+// ---------- ニュース（入管庁・特定技能制度ページ・報道。朝昼夕に自動取得） ----------
+const unreadNews = () => { const n=S.news||{items:[],seen:{}}; const seen=(n.seen||{})[staff]||""; return (n.items||[]).filter(x=>x.at && x.at>seen); };
+function updateNewsBadge(){
+  const u=S.ready?unreadNews().length:0; const b=$("#newsBdg");
+  if(b){ b.textContent=u>99?"99+":String(u); b.hidden=!u; }
+  document.title=(u?`(${u}) `:"")+"Linola 支援台帳";
+  try{ if(navigator.setAppBadge){ if(u) navigator.setAppBadge(u); else navigator.clearAppBadge(); } }catch(e){}
+  return u;
+}
+function newsBar(){ const u=S.ready?unreadNews().length:0; return u? `<button type="button" class="newsbar">📰 新着ニュース ${u}件<span class="go">タップして確認 ›</span></button>` : ""; }
+function injectNewsBar(){ const b=newsBar(); if(b) $("#main").insertAdjacentHTML("afterbegin", b); }
+document.addEventListener("click", e=>{ if(e.target.closest && e.target.closest(".newsbar")) go("#/news"); });
+function viewNews(){
+  $("#title").innerHTML=`<span class="brand">特定技能</span>ニュース`;
+  const n=S.news||{items:[]}; const un=new Set(unreadNews().map(x=>x.id)); const st=n.status;
+  const cls=s=> s==="ニュース"?"ret":"acc";
+  $("#main").innerHTML=`<div class="banner info">出入国在留管理庁の更新情報と特定技能関連の報道を、朝・昼・夕の1日3回自動で集めています。</div>
+    <div class="card">${(n.items||[]).map(x=>`<div class="nitem"><div class="nm2">${un.has(x.id)?'<span class="pill new">NEW</span>':""}<span class="pill ${cls(x.src)}">${esc(x.src)}</span><span>${esc(x.date||"")}${x.cat&&x.src==="ニュース"?" · "+esc(x.cat):""}</span></div><a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.title)}</a></div>`).join("") || `<div class="empty">まだニュースがありません</div>`}</div>
+    <div class="empty" style="font-size:12px">${st&&st.at?"最終取得: "+esc(new Date(st.at).toLocaleString("ja-JP"))+" · ":""}<a href="#" id="newsNow">今すぐ取得</a></div>`;
+  $("#newsNow").addEventListener("click", async e=>{ e.preventDefault(); toast("取得中…"); try{ const r=await call("fetchNewsNow"); toast(r&&r.skipped?"少し前に取得済みです":(r&&r.added?`${r.added}件 追加`:"新着はありません")); await load(true); }catch(err){ toast("取得に失敗"); } });
+  if(staff && un.size){ S.news.seen=Object.assign({}, S.news.seen, {[staff]:new Date().toISOString()}); updateNewsBadge(); call("markNewsSeen", staff).catch(()=>{}); }
 }
 
 function viewMemoForm(rec, type){
@@ -733,8 +767,8 @@ function viewPreCase(id){
   $("#editP").addEventListener("click", ()=>viewPreForm(p));
   $("#delP").addEventListener("click", async ()=>{ if(!confirm(`「${p.cname}」の内定案件を削除しますか？`)) return; try{ await call("deletePre", p.id); delete S.pre[p.id]; cachePre(); go("#/pre"); }catch(_){ toast("削除に失敗"); } });
 }
-function syncTabs(view){ const isPre = view==="pre"||view==="prec"||view==="newpre"; document.querySelectorAll("[data-tab]").forEach(b=>b.classList.toggle("on", (b.dataset.tab==="pre")===isPre)); }
-document.querySelectorAll("[data-tab]").forEach(b=>b.addEventListener("click", ()=>go(b.dataset.tab==="pre"?"#/pre":"#/")));
+function syncTabs(view){ const t = (view==="pre"||view==="prec"||view==="newpre")?"pre":(view==="news"?"news":"home"); document.querySelectorAll("[data-tab]").forEach(b=>b.classList.toggle("on", b.dataset.tab===t)); }
+document.querySelectorAll("[data-tab]").forEach(b=>b.addEventListener("click", ()=>go(b.dataset.tab==="pre"?"#/pre":b.dataset.tab==="news"?"#/news":"#/")));
 
 // 顔写真タップで拡大表示
 document.addEventListener("click", e=>{ const im=e.target.closest(".wphoto img"); if(!im) return; const lb=document.createElement("div"); lb.className="lb"; const big=document.createElement("img"); big.src=im.src; big.alt=""; lb.appendChild(big); lb.addEventListener("click", ()=>lb.remove()); document.body.appendChild(lb); });
