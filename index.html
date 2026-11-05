@@ -66,6 +66,9 @@ a{color:var(--accent);text-decoration:none}
 .newsbar{display:flex;align-items:center;gap:8px;width:100%;border:0;border-radius:12px;padding:11px 14px;margin-bottom:10px;background:var(--crit);color:#fff;font-size:14px;font-weight:700;cursor:pointer;text-align:left;font-family:inherit}
 .newsbar .go{margin-left:auto;font-weight:500;font-size:12px;opacity:.9}
 .pill.new{background:var(--crit);color:#fff}
+.pill.ef{background:#efe7fb;color:#5b3391}
+.newsbar.ef{background:#5b3391}
+.banner.ef{background:#efe7fb;color:#4c2a7a}
 .nitem{padding:9px 0;border-bottom:1px solid var(--line)}
 .nitem:last-child{border-bottom:0}
 .nitem a{color:var(--text);text-decoration:none;font-size:14px;line-height:1.45;display:block}
@@ -292,6 +295,12 @@ const workersOf = cid => Object.values(S.workers).filter(w=>w.cid===cid).sort((a
 const setStaff = v => { staff=v; try{localStorage.setItem("linola.staff",staff);}catch(e){} };
 const toISO = s => { const d=parseDate(s); return d? `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}` : ""; };
 const followOf = c => { const list=[c.follow, ...workersOf(c.id).map(w=>w.follow)].filter(f=>f&&f.open).map(f=>Object.assign({}, f, {days:daysTo(f.next)})); if(!list.length) return null; list.sort((a,b)=>((a.days??1e9)-(b.days??1e9)) || (b.level-a.level)); return list[0]; };
+// 入国直後フォロー：入国日から7日（1週間）・30日（1ヵ月）を過ぎたら声かけ時期。節目の3日前以降に対応履歴が無い間は通知を出し続ける（1週間は29日目まで、1ヵ月は59日目まで）
+const entryFollow = w => { if(!w||w.retired) return null; const d=parseDate(w.entry); if(!d) return null; const n=Math.floor((new Date().setHours(0,0,0,0)-d)/864e5); if(n<7||n>=60) return null; const ms = n>=30 ? {key:"m1",label:"入国1ヵ月",at:30} : {key:"w1",label:"入国1週間",at:7}; const since=new Date(d); since.setDate(since.getDate()+ms.at-3); const done=Object.values(S.logs).some(l=>l.wid===w.id && (parseDate(l.date)||0)>=since); return Object.assign({days:n, done}, ms); };
+const entryList = () => S.ready ? Object.values(S.workers).map(w=>({w, f:entryFollow(w)})).filter(x=>x.f&&!x.f.done) : [];
+const entryPill = w => { const f=entryFollow(w); return f&&!f.done? `<span class="pill ef">${f.label}</span>` : ""; };
+const entryBar = () => { const l=entryList(); if(!l.length) return ""; const a=l.filter(x=>x.f.key==="w1").length, b=l.length-a; return `<button type="button" class="newsbar ef efbar">🛬 入国フォロー ${l.length}名（1週間 ${a}・1ヵ月 ${b}）<span class="go">タップして一覧 ›</span></button>`; };
+document.addEventListener("click", e=>{ if(e.target.closest && e.target.closest(".efbar")){ filt.flags=["entry"]; filt.prefs=[]; filt.q=""; render(); const el=$("#list"); if(el) el.scrollIntoView({behavior:"smooth",block:"start"}); } });
 const followPill = f => { if(!f||!f.open) return ""; const d=("days" in f)? f.days : daysTo(f.next); const lv="●".repeat(f.level||2)+"○".repeat(3-(f.level||2)); let t="対応中 "+lv; if(d!==null) t+= d<0?` 超過${-d}日`:d===0?" 今日":` あと${d}日`; const cls=(d!==null&&d<=3)?"crit":((d!==null&&d<=7)||f.level>=3)?"warn":"acc"; return `<span class="pill ${cls}">${t}</span>`; };
 
 // ---------- routing ----------
@@ -360,6 +369,7 @@ function viewHome(){
   const soon = warn.filter(w=>exDays(w)<=30), warn90 = warn.filter(w=>exDays(w)>30), applyN = active.filter(applying);
   const fAll=all.map(followOf).filter(Boolean); const nFollow=fAll.length, nDue=fAll.filter(f=>f.days!==null&&f.days<=7).length;
   $("#main").innerHTML = `
+    ${entryBar()}
     <div class="summary s3">
       <div class="tile"><b>${all.length}</b><span>受入企業数</span></div>
       <div class="tile"><b>${entered.length}</b><span>入国在職中</span></div>
@@ -374,7 +384,7 @@ function viewHome(){
     <div class="search"><input id="q" type="search" placeholder="企業名・店舗・外国人名で検索" value="${esc(filt.q)}" autocomplete="off"></div>
     <div class="chips">
       <button class="chip ${!filt.flags.length&&!filt.prefs.length?"on":""}" data-clear="1">すべて</button>
-      ${[["follow","対応中"+(nFollow?` ${nFollow}`:"")],["due","対応期限7日以内"+(nDue?` ${nDue}`:"")],["active","在職者あり"],["expired","期限切れ"],["warn","90日以内"],["apply","申請中"],["pending","退職予定"],["retired","退職者あり"]].map(([k,l])=>`<button class="chip ${filt.flags.includes(k)?"on":""}" data-flag="${k}">${l}</button>`).join("")}
+      ${[["entry","入国フォロー"+(entryList().length?` ${entryList().length}`:"")],["follow","対応中"+(nFollow?` ${nFollow}`:"")],["due","対応期限7日以内"+(nDue?` ${nDue}`:"")],["active","在職者あり"],["expired","期限切れ"],["warn","90日以内"],["apply","申請中"],["pending","退職予定"],["retired","退職者あり"]].map(([k,l])=>`<button class="chip ${filt.flags.includes(k)?"on":""}" data-flag="${k}">${l}</button>`).join("")}
       ${prefs.map(p=>`<button class="chip pref ${filt.prefs.includes(p)?"on":""}" data-pref="${esc(p)}">${esc(p)}</button>`).join("")}
     </div>
     <div class="empty" style="font-size:11.5px;padding:0 0 6px">絞り込みは複数選べます（都道府県は「どれか」、他は「すべて満たす」）</div>
@@ -398,6 +408,7 @@ function homeList(){
     if(filt.prefs.length && !filt.prefs.includes(c.pref)) return false;
     const ws=workersOf(c.id); const fs=followOf(c); fmap[c.id]=fs;
     if(has("follow") && !fs) return false;
+    if(has("entry") && !ws.some(w=>{const f=entryFollow(w); return f&&!f.done;})) return false;
     if(has("due") && !(fs && fs.days!==null && fs.days<=7)) return false;
     if(has("apply") && !ws.some(w=>!w.retired && applying(w))) return false;
     if(has("warn") && !ws.some(w=>{const n=exDays(w); return !w.retired && n!==null && n>=0 && n<=90;})) return false;
@@ -410,7 +421,7 @@ function homeList(){
   });
   if(has("follow")||has("due")) rows.sort((a,b)=>{ const fa=fmap[a.id], fb=fmap[b.id]; return ((fa.days??1e9)-(fb.days??1e9)) || (fb.level-fa.level); });
   el.innerHTML = rows.map(c=>{ const ws=workersOf(c.id); const act=ws.filter(w=>!w.retired).length; const wl=lastLog(l=>l.cid===c.id); const hasExp=ws.some(w=>{const n=exDays(w); return !w.retired&&n!==null&&n<0;}); const hasWarn=!hasExp&&ws.some(w=>{const n=exDays(w); return !w.retired&&n!==null&&n<=90;});
-        return `<button class="row" data-go="#/c/${encodeURIComponent(c.id)}"><div class="body"><div class="t"><span class="nm">${esc(c.name)}</span>${followPill(fmap[c.id])}${flagPill("company",c.id)}${hasExp?'<span class="pill crit">期限切れ</span>':hasWarn?'<span class="pill warn">期限注意</span>':""}${c.src==="own"?'<span class="pill acc">追加</span>':""}</div><div class="s">${esc([c.pref,c.city].filter(Boolean).join(" "))}${c.store?" · "+esc(c.store):""}${wl?" · 最終対応 "+esc(wl.date):""}</div></div><div class="n"><b>${act}</b>名${ws.length-act?`<span style="color:var(--muted)">/退${ws.length-act}</span>`:""}</div></button>`; }).join("") || `<div class="empty">該当する企業がありません</div>`;
+        return `<button class="row" data-go="#/c/${encodeURIComponent(c.id)}"><div class="body"><div class="t"><span class="nm">${esc(c.name)}</span>${followPill(fmap[c.id])}${flagPill("company",c.id)}${ws.some(w=>{const f=entryFollow(w); return f&&!f.done;})?'<span class="pill ef">入国フォロー</span>':""}${hasExp?'<span class="pill crit">期限切れ</span>':hasWarn?'<span class="pill warn">期限注意</span>':""}${c.src==="own"?'<span class="pill acc">追加</span>':""}</div><div class="s">${esc([c.pref,c.city].filter(Boolean).join(" "))}${c.store?" · "+esc(c.store):""}${wl?" · 最終対応 "+esc(wl.date):""}</div></div><div class="n"><b>${act}</b>名${ws.length-act?`<span style="color:var(--muted)">/退${ws.length-act}</span>`:""}</div></button>`; }).join("") || `<div class="empty">該当する企業がありません</div>`;
   el.querySelectorAll("[data-go]").forEach(b=>b.addEventListener("click", ()=>go(b.dataset.go)));
 }
 
@@ -471,7 +482,7 @@ function viewCompany(id){
   const c=S.companies[id]; if(!c){ $("#main").innerHTML=`<div class="empty">企業が見つかりません</div>`; return; }
   $("#title").innerHTML=`<span class="brand">受入企業</span>${esc(c.name)}`;
   const ws=workersOf(id); const act=ws.filter(w=>!w.retired), ret=ws.filter(w=>w.retired);
-  const wrow = w => `<button class="row" data-go="#/w/${encodeURIComponent(w.id)}"><div class="body"><div class="t"><span class="nm">${esc(w.name)}</span>${followPill(w.follow)}${flagPill("worker",w.id)}${expiryPill(w)}</div><div class="s">${esc([w.kana,w.nationality,w.jp].filter(Boolean).join(" · "))}${w.entry?" · 入国 "+esc(w.entry):""}</div></div><div class="n">›</div></button>`;
+  const wrow = w => `<button class="row" data-go="#/w/${encodeURIComponent(w.id)}"><div class="body"><div class="t"><span class="nm">${esc(w.name)}</span>${followPill(w.follow)}${flagPill("worker",w.id)}${entryPill(w)}${expiryPill(w)}</div><div class="s">${esc([w.kana,w.nationality,w.jp].filter(Boolean).join(" · "))}${w.entry?" · 入国 "+esc(w.entry):""}</div></div><div class="n">›</div></button>`;
   $("#main").innerHTML = `
     <div class="hero"><h2>${esc(c.name)}</h2><div class="sub">${esc([c.pref,c.city].filter(Boolean).join(" "))}${c.field?" · "+esc(c.field):""}${c.category?" · "+esc(c.category):""}</div>
       <div class="pills">${followPill(c.follow)}<span class="pill acc">在職 ${act.length}名</span>${ret.length?`<span class="pill ret">退職 ${ret.length}名</span>`:""}${c.fee?`<span class="pill ok">支援費 ${esc(c.fee)}</span>`:""}</div>
@@ -549,8 +560,9 @@ const unreadNews = () => { const n=S.news||{items:[],seen:{}}; const seen=(n.see
 function updateNewsBadge(){
   const u=S.ready?unreadNews().length:0; const b=$("#newsBdg");
   if(b){ b.textContent=u>99?"99+":String(u); b.hidden=!u; }
-  document.title=(u?`(${u}) `:"")+"Linola 支援台帳";
-  try{ if(navigator.setAppBadge){ if(u) navigator.setAppBadge(u); else navigator.clearAppBadge(); } }catch(e){}
+  const t=u+entryList().length;
+  document.title=(t?`(${t}) `:"")+"Linola 支援台帳";
+  try{ if(navigator.setAppBadge){ if(t) navigator.setAppBadge(t); else navigator.clearAppBadge(); } }catch(e){}
   return u;
 }
 function newsBar(){ const u=S.ready?unreadNews().length:0; return u? `<button type="button" class="newsbar">📰 新着ニュース ${u}件<span class="go">タップして確認 ›</span></button>` : ""; }
@@ -617,9 +629,10 @@ function viewWorker(id){
   const n=exDays(w);
   $("#main").innerHTML=`
     <div class="hero"><div class="wphoto" id="wphoto"></div><h2>${esc(w.name)}</h2><div class="sub">${esc([w.kana,w.nationality,w.gender,w.age?w.age+"歳":""].filter(Boolean).join(" · "))}</div>
-      <div class="pills">${followPill(w.follow)}${w.retired?`<span class="pill ret">退職${w.retireDate?" "+esc(w.retireDate):""}</span>`:w.pending?`<span class="pill warn">退職予定${w.retireDate?" "+esc(w.retireDate):""}</span>`:`<span class="pill ok">在職中</span>`}${w.jp?`<span class="pill acc">${esc(w.jp)}</span>`:""}${applying(w)&&!w.retired?'<span class="pill acc">申請中</span>':""}${n!==null&&!w.retired?(n<0?`<span class="pill crit">在留期限切れ</span>`:n<=90?`<span class="pill warn">在留期限まで${n}日</span>`:w.expiryUpdated?`<span class="pill ok">期限更新済（こちら入力）</span>`:""):""}</div>
+      <div class="pills">${followPill(w.follow)}${entryPill(w)}${w.retired?`<span class="pill ret">退職${w.retireDate?" "+esc(w.retireDate):""}</span>`:w.pending?`<span class="pill warn">退職予定${w.retireDate?" "+esc(w.retireDate):""}</span>`:`<span class="pill ok">在職中</span>`}${w.jp?`<span class="pill acc">${esc(w.jp)}</span>`:""}${applying(w)&&!w.retired?'<span class="pill acc">申請中</span>':""}${n!==null&&!w.retired?(n<0?`<span class="pill crit">在留期限切れ</span>`:n<=90?`<span class="pill warn">在留期限まで${n}日</span>`:w.expiryUpdated?`<span class="pill ok">期限更新済（こちら入力）</span>`:""):""}</div>
       <div class="btns">${telBtn(w.tel)}<button class="btn" id="editW">${w.src==="own"?"情報を編集":"補足メモ・状態"}</button><button class="btn" data-go="#/c/${encodeURIComponent(w.cid)}">企業ページへ</button></div>
     </div>
+    ${(()=>{ const f=entryFollow(w); return f&&!f.done? `<div class="banner ef">🛬 入国から${f.days}日。<b>${esc(f.label)}</b>の声かけ時期です。不安や困りごとを聞いて、対応履歴を追加すると通知が消えます。</div>` : ""; })()}
     ${flagSection("worker", w)}
     <section class="sec"><div class="sec-h"><h2>基本情報${w.src==="ref"?"（Linola表より・参照のみ）":""}</h2></div><div class="card">
       ${kv("受入企業",c.name)}${kv("国籍",w.nationality)}${kv("送出機関",w.agency)}${kv("分野",w.field)}${kv("生年月日",w.birth,true)}${kv("日本語",w.jp)}${kv("電話",w.tel,true)}${kv("住所",w.address)}
