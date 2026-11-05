@@ -567,7 +567,7 @@ function updateNewsBadge(){
 }
 function newsBar(){ const u=S.ready?unreadNews().length:0; return u? `<button type="button" class="newsbar">📰 新着ニュース ${u}件<span class="go">タップして確認 ›</span></button>` : ""; }
 function injectNewsBar(){ const b=newsBar(); if(b) $("#main").insertAdjacentHTML("afterbegin", b); }
-document.addEventListener("click", e=>{ if(e.target.closest && e.target.closest(".newsbar")) go("#/news"); });
+document.addEventListener("click", e=>{ if(e.target.closest && e.target.closest(".newsbar") && !e.target.closest(".efbar")) go("#/news"); });
 function viewNews(){
   $("#title").innerHTML=`<span class="brand">特定技能</span>ニュース`;
   const n=S.news||{items:[]}; const un=new Set(unreadNews().map(x=>x.id)); const st=n.status;
