@@ -67,6 +67,17 @@ a{color:var(--accent);text-decoration:none}
 .newsbar .go{margin-left:auto;font-weight:500;font-size:12px;opacity:.9}
 .pill.new{background:var(--crit);color:#fff}
 .pill.ef{background:#efe7fb;color:#5b3391}
+.pill.main{background:var(--surface2);color:var(--ink2)}
+.pill.line{background:#e3f5e8;color:#1b7a38}
+.mainbox{margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}
+.mainbox label{display:flex;align-items:center;gap:10px;font-size:13px;font-weight:600;color:var(--ink2);white-space:nowrap}
+.mainbox select,.lrow select{flex:1;min-width:0;font:inherit;font-size:15px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink)}
+.mainbox .note{font-size:11.5px;color:var(--muted);margin-top:5px}
+.lrow{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--line)}
+.lrow:last-child{border-bottom:0}
+.lrow .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;font-size:14px}
+.lrow .lk{font-size:11.5px;color:var(--muted);flex:none}
+.lrow .del{background:none;border:0;color:var(--muted);font-size:12px;cursor:pointer;padding:0;flex:none}
 .newsbar.ef{background:#5b3391}
 .banner.ef{background:#efe7fb;color:#4c2a7a}
 .nitem{padding:9px 0;border-bottom:1px solid var(--line)}
@@ -262,7 +273,7 @@ async function resolveKey(){
 function applyData(d, fromCache){
   S.companies={}; S.workers={}; S.logs={};
   d.companies.forEach(c=>S.companies[c.id]=c); d.workers.forEach(w=>S.workers[w.id]=w); d.logs.forEach(l=>S.logs[l.id]=l);
-  S.refreshedAt=d.refreshedAt; S.fromCache=!!fromCache; S.ready=true; if(!fromCache) S.lastFetch=Date.now(); S.staffList=d.staffList||[]; S.flags=d.flags||[]; S.pre={}; (d.pre||[]).forEach(p=>S.pre[p.id]=p); S.preCands=d.preCands||[]; S.preSteps=d.preSteps||S.preSteps||[]; S.news=d.news||{items:[],seen:{}}; setTimeout(updateNewsBadge,0);
+  S.refreshedAt=d.refreshedAt; S.fromCache=!!fromCache; S.ready=true; if(!fromCache) S.lastFetch=Date.now(); S.staffList=d.staffList||[]; S.flags=d.flags||[]; S.pre={}; (d.pre||[]).forEach(p=>S.pre[p.id]=p); S.preCands=d.preCands||[]; S.preSteps=d.preSteps||S.preSteps||[]; S.news=d.news||{items:[],seen:{}}; S.links=d.links||[]; setTimeout(updateNewsBadge,0);
   if(!staff && !S.pickerShown){ S.pickerShown=true; setTimeout(()=>openStaff(true),0); }
 }
 async function load(silent){
@@ -301,6 +312,25 @@ const entryList = () => S.ready ? Object.values(S.workers).map(w=>({w, f:entryFo
 const entryPill = w => { const f=entryFollow(w); return f&&!f.done? `<span class="pill ef">${f.label}</span>` : ""; };
 const entryBar = () => { const l=entryList(); if(!l.length) return ""; const a=l.filter(x=>x.f.key==="w1").length, b=l.length-a; return `<button type="button" class="newsbar ef efbar">🛬 入国フォロー ${l.length}名（1週間 ${a}・1ヵ月 ${b}）<span class="go">タップして一覧 ›</span></button>`; };
 document.addEventListener("click", e=>{ if(e.target.closest && e.target.closest(".efbar")){ filt.flags=["entry"]; filt.prefs=[]; filt.q=""; render(); const el=$("#list"); if(el) el.scrollIntoView({behavior:"smooth",block:"start"}); } });
+// メイン担当（企業ごとに1名・窓口の目安）と、LINEトークのひも付け
+const mainPill = c => c&&c.main ? `<span class="pill main">メイン：${esc(String(c.main).split(/[\s　]/)[0])}</span>` : "";
+const patchCache = fn => { try{ const k=JSON.parse(localStorage.getItem("linola.cache")||"null"); if(k){ fn(k); localStorage.setItem("linola.cache", JSON.stringify(k)); } }catch(_){} };
+const linksOf = (type,id) => (S.links||[]).filter(l=>l.ttype===type && l.tid===id);
+const allTalks = () => { const m={}; (S.links||[]).forEach(l=>{ if(l.kind!=="スタッフルーム" && !m[l.talkId]) m[l.talkId]={talkId:l.talkId, kind:l.kind, name:l.name}; }); return Object.values(m); };
+function lineSection(type, rec){
+  const talks=allTalks(); if(!talks.length) return "";
+  const mine=linksOf(type, rec.id); const rest=talks.filter(t=>!mine.some(l=>l.talkId===t.talkId));
+  return `<section class="sec"><div class="sec-h"><h2>LINE${mine.length?` (${mine.length})`:""}</h2></div><div class="card">
+    ${mine.map(l=>`<div class="lrow"><span class="pill line">LINE</span><span class="nm">${esc(l.name||"（名前なし）")}</span><span class="lk">${esc(l.kind)}</span><button class="del" type="button" data-lunlink="${esc(l.talkId)}">解除</button></div>`).join("") || `<div class="empty" style="padding:6px 0">ひも付いているLINEトークはありません</div>`}
+    ${rest.length?`<div class="lrow"><select id="lineAdd"><option value="">＋ LINEトークをひも付ける…</option>${rest.map(t=>`<option value="${esc(t.talkId)}">${esc(t.name||"（名前なし）")}（${esc(t.kind)}）</option>`).join("")}</select></div>`:""}
+  </div></section>`;
+}
+function wireLine(type, rec){
+  const done = (links,msg) => { S.links=links; patchCache(k=>{ k.links=links; }); toast(msg); render(); };
+  const need = () => { if(staff) return true; toast("先に担当者を選んでください"); openStaff(true); return false; };
+  const a=$("#lineAdd"); if(a) a.addEventListener("change", async e=>{ const v=e.target.value; if(!v) return; if(!need()){ e.target.value=""; return; } e.target.disabled=true; try{ done(await call("linkTalk",{talkId:v,type,tid:rec.id,tname:rec.name,staff}), "LINEトークをひも付けました"); }catch(err){ toast("保存に失敗: "+(err.message||err)); e.target.disabled=false; e.target.value=""; } });
+  document.querySelectorAll("[data-lunlink]").forEach(b=>b.addEventListener("click", async ()=>{ if(!need()) return; if(!confirm("このLINEトークとのひも付けを外しますか？")) return; b.disabled=true; try{ done(await call("unlinkTalk",{talkId:b.dataset.lunlink,type,tid:rec.id,tname:rec.name,staff}), "ひも付けを外しました"); }catch(err){ toast("解除に失敗: "+(err.message||err)); b.disabled=false; } }));
+}
 const followPill = f => { if(!f||!f.open) return ""; const d=("days" in f)? f.days : daysTo(f.next); const lv="●".repeat(f.level||2)+"○".repeat(3-(f.level||2)); let t="対応中 "+lv; if(d!==null) t+= d<0?` 超過${-d}日`:d===0?" 今日":` あと${d}日`; const cls=(d!==null&&d<=3)?"crit":((d!==null&&d<=7)||f.level>=3)?"warn":"acc"; return `<span class="pill ${cls}">${t}</span>`; };
 
 // ---------- routing ----------
@@ -384,7 +414,7 @@ function viewHome(){
     <div class="search"><input id="q" type="search" placeholder="企業名・店舗・外国人名で検索" value="${esc(filt.q)}" autocomplete="off"></div>
     <div class="chips">
       <button class="chip ${!filt.flags.length&&!filt.prefs.length?"on":""}" data-clear="1">すべて</button>
-      ${[["entry","入国フォロー"+(entryList().length?` ${entryList().length}`:"")],["follow","対応中"+(nFollow?` ${nFollow}`:"")],["due","対応期限7日以内"+(nDue?` ${nDue}`:"")],["active","在職者あり"],["expired","期限切れ"],["warn","90日以内"],["apply","申請中"],["pending","退職予定"],["retired","退職者あり"]].map(([k,l])=>`<button class="chip ${filt.flags.includes(k)?"on":""}" data-flag="${k}">${l}</button>`).join("")}
+      ${[["entry","入国フォロー"+(entryList().length?` ${entryList().length}`:"")],["follow","対応中"+(nFollow?` ${nFollow}`:"")],["due","対応期限7日以内"+(nDue?` ${nDue}`:"")],["active","在職者あり"],["expired","期限切れ"],["warn","90日以内"],["apply","申請中"],["pending","退職予定"],["retired","退職者あり"],["mine","メインが自分"],["nomain","メイン未設定"]].map(([k,l])=>`<button class="chip ${filt.flags.includes(k)?"on":""}" data-flag="${k}">${l}</button>`).join("")}
       ${prefs.map(p=>`<button class="chip pref ${filt.prefs.includes(p)?"on":""}" data-pref="${esc(p)}">${esc(p)}</button>`).join("")}
     </div>
     <div class="empty" style="font-size:11.5px;padding:0 0 6px">絞り込みは複数選べます（都道府県は「どれか」、他は「すべて満たす」）</div>
@@ -408,6 +438,8 @@ function homeList(){
     if(filt.prefs.length && !filt.prefs.includes(c.pref)) return false;
     const ws=workersOf(c.id); const fs=followOf(c); fmap[c.id]=fs;
     if(has("follow") && !fs) return false;
+    if(has("mine") && !(staff && c.main===staff)) return false;
+    if(has("nomain") && c.main) return false;
     if(has("entry") && !ws.some(w=>{const f=entryFollow(w); return f&&!f.done;})) return false;
     if(has("due") && !(fs && fs.days!==null && fs.days<=7)) return false;
     if(has("apply") && !ws.some(w=>!w.retired && applying(w))) return false;
@@ -421,7 +453,7 @@ function homeList(){
   });
   if(has("follow")||has("due")) rows.sort((a,b)=>{ const fa=fmap[a.id], fb=fmap[b.id]; return ((fa.days??1e9)-(fb.days??1e9)) || (fb.level-fa.level); });
   el.innerHTML = rows.map(c=>{ const ws=workersOf(c.id); const act=ws.filter(w=>!w.retired).length; const wl=lastLog(l=>l.cid===c.id); const hasExp=ws.some(w=>{const n=exDays(w); return !w.retired&&n!==null&&n<0;}); const hasWarn=!hasExp&&ws.some(w=>{const n=exDays(w); return !w.retired&&n!==null&&n<=90;});
-        return `<button class="row" data-go="#/c/${encodeURIComponent(c.id)}"><div class="body"><div class="t"><span class="nm">${esc(c.name)}</span>${followPill(fmap[c.id])}${flagPill("company",c.id)}${ws.some(w=>{const f=entryFollow(w); return f&&!f.done;})?'<span class="pill ef">入国フォロー</span>':""}${hasExp?'<span class="pill crit">期限切れ</span>':hasWarn?'<span class="pill warn">期限注意</span>':""}${c.src==="own"?'<span class="pill acc">追加</span>':""}</div><div class="s">${esc([c.pref,c.city].filter(Boolean).join(" "))}${c.store?" · "+esc(c.store):""}${wl?" · 最終対応 "+esc(wl.date):""}</div></div><div class="n"><b>${act}</b>名${ws.length-act?`<span style="color:var(--muted)">/退${ws.length-act}</span>`:""}</div></button>`; }).join("") || `<div class="empty">該当する企業がありません</div>`;
+        return `<button class="row" data-go="#/c/${encodeURIComponent(c.id)}"><div class="body"><div class="t"><span class="nm">${esc(c.name)}</span>${followPill(fmap[c.id])}${mainPill(c)}${flagPill("company",c.id)}${ws.some(w=>{const f=entryFollow(w); return f&&!f.done;})?'<span class="pill ef">入国フォロー</span>':""}${hasExp?'<span class="pill crit">期限切れ</span>':hasWarn?'<span class="pill warn">期限注意</span>':""}${c.src==="own"?'<span class="pill acc">追加</span>':""}</div><div class="s">${esc([c.pref,c.city].filter(Boolean).join(" "))}${c.store?" · "+esc(c.store):""}${wl?" · 最終対応 "+esc(wl.date):""}</div></div><div class="n"><b>${act}</b>名${ws.length-act?`<span style="color:var(--muted)">/退${ws.length-act}</span>`:""}</div></button>`; }).join("") || `<div class="empty">該当する企業がありません</div>`;
   el.querySelectorAll("[data-go]").forEach(b=>b.addEventListener("click", ()=>go(b.dataset.go)));
 }
 
@@ -458,7 +490,7 @@ function logSection(scope, pred, rec){
       </form>
     </div>
     <div class="card" style="margin-top:8px">
-      ${logs.map(l=>`<div class="log"><div class="when">${esc(l.date)}</div><div style="flex:1;min-width:0"><div class="who"><span class="kindtag">${esc(l.kind||"")}</span>${esc(l.staff||"")}${scope==="company"&&l.wid?`<span class="pill acc">${esc(l.wname||"")}</span>`:""}<button class="del" data-del="${esc(l.id)}">削除</button></div><div class="txt clamp">${esc(l.text)}</div><button class="more" type="button">もっと見る</button></div></div>`).join("") || `<div class="empty">まだ履歴がありません</div>`}
+      ${logs.map(l=>`<div class="log"><div class="when">${esc(l.date)}</div><div style="flex:1;min-width:0"><div class="who"><span class="kindtag">${esc(l.kind||"")}</span>${l.src==="LINE"&&l.kind!=="LINE"?'<span class="pill line">LINE</span>':""}${l.imp?'<span class="pill crit">重要</span>':""}${esc(l.staff||"")}${scope==="company"&&l.wid?`<span class="pill acc">${esc(l.wname||"")}</span>`:""}<button class="del" data-del="${esc(l.id)}">削除</button></div><div class="txt clamp">${esc(l.text)}</div><button class="more" type="button">もっと見る</button></div></div>`).join("") || `<div class="empty">まだ履歴がありません</div>`}
     </div></section>`;
 }
 function wireLogs(base, rec){
@@ -486,9 +518,12 @@ function viewCompany(id){
   $("#main").innerHTML = `
     <div class="hero"><h2>${esc(c.name)}</h2><div class="sub">${esc([c.pref,c.city].filter(Boolean).join(" "))}${c.field?" · "+esc(c.field):""}${c.category?" · "+esc(c.category):""}</div>
       <div class="pills">${followPill(c.follow)}<span class="pill acc">在職 ${act.length}名</span>${ret.length?`<span class="pill ret">退職 ${ret.length}名</span>`:""}${c.fee?`<span class="pill ok">支援費 ${esc(c.fee)}</span>`:""}</div>
+      <div class="mainbox"><label>メイン担当<select id="mainSel"><option value="">（未設定）</option>${[...new Set([...(S.staffList||[]), ...(c.main?[c.main]:[])])].map(n=>`<option value="${esc(n)}" ${n===c.main?"selected":""}>${esc(n)}</option>`).join("")}</select></label>
+        <div class="note">窓口の目安です（責任はチーム全員で持ちます）。${(()=>{ if(c.main) return ""; const l=lastLog(x=>x.cid===id&&(S.staffList||[]).includes(x.staff)); return l? ` 最近対応：<b>${esc(l.staff)}</b>（${esc(l.date)}）` : ""; })()}</div></div>
       <div class="btns">${telBtn(c.tel)}<button class="btn" id="editC">${c.src==="own"?"情報を編集":"補足メモを編集"}</button></div>
     </div>
     ${flagSection("company", c)}
+    ${lineSection("company", c)}
     <section class="sec"><div class="sec-h"><h2>企業情報${c.src==="ref"?"（Linola表より・参照のみ）":""}</h2></div><div class="card">
       ${kv("受入店舗",c.store)}${kv("代表者",c.rep)}${kv("担当者",c.contact)}${kv("連絡先",c.tel,true)}${kv("メール",c.email,true)}${kv("勤務地",c.workplace)}${kv("支援費(税込)",c.fee,true)}${kv("補足メモ",c.memo)}
     </div></section>
@@ -497,7 +532,10 @@ function viewCompany(id){
       ${ret.length?`<div class="wgroup">退職者</div>${ret.map(wrow).join("")}`:""}</div>
     </section>
     ${logSection("company", l=>l.cid===id, c)}`;
-  wire(); wireLogs({type:"company", cid:id, cname:c.name, wid:"", wname:""}, c); wireFlags("company", c);
+  wire(); wireLogs({type:"company", cid:id, cname:c.name, wid:"", wname:""}, c); wireFlags("company", c); wireLine("company", c);
+  $("#mainSel").addEventListener("change", async e=>{ const v=e.target.value; if(!staff){ toast("先に担当者を選んでください"); e.target.value=c.main||""; openStaff(true); return; } e.target.disabled=true;
+    try{ await call("setMain",{cid:id,cname:c.name,main:v,staff}); c.main=v; patchCache(k=>{ const t=(k.companies||[]).find(x=>x.id===id); if(t) t.main=v; }); toast(v?`メイン担当：${v}`:"メイン担当を外しました"); render(); }
+    catch(err){ toast("保存に失敗: "+(err.message||err)); e.target.value=c.main||""; e.target.disabled=false; } });
   $("#editC").addEventListener("click", ()=> c.src==="own" ? viewCompanyForm(c) : viewMemoForm(c,"company"));
 }
 
@@ -634,6 +672,7 @@ function viewWorker(id){
     </div>
     ${(()=>{ const f=entryFollow(w); return f&&!f.done? `<div class="banner ef">🛬 入国から${f.days}日。<b>${esc(f.label)}</b>の声かけ時期です。不安や困りごとを聞いて、対応履歴を追加すると通知が消えます。</div>` : ""; })()}
     ${flagSection("worker", w)}
+    ${lineSection("worker", w)}
     <section class="sec"><div class="sec-h"><h2>基本情報${w.src==="ref"?"（Linola表より・参照のみ）":""}</h2></div><div class="card">
       ${kv("受入企業",c.name)}${kv("国籍",w.nationality)}${kv("送出機関",w.agency)}${kv("分野",w.field)}${kv("生年月日",w.birth,true)}${kv("日本語",w.jp)}${kv("電話",w.tel,true)}${kv("住所",w.address)}
     </div></section>
@@ -641,7 +680,7 @@ function viewWorker(id){
       ${kv("在留カード",w.cardNo+(w.origCardNo?"\n（Linola表: "+w.origCardNo+"）":""),true)}${kv("有効期限",w.expiry+(w.expiryUpdated?"\n（Linola表: "+(w.origExpiry||"—")+"）":""),true)}${kv("入国日",w.entry,true)}${kv("申請日",w.applyDate,true)}${kv("申請番号",w.applyNo,true)}${kv("支援費",w.fee,true)}${kv("補足メモ",w.memo)}
     </div></section>
     ${logSection("worker", l=>l.wid===id, w)}`;
-  wire(); wireLogs({type:"worker", cid:w.cid, cname:c.name, wid:id, wname:w.name}, w); wireFlags("worker", w);
+  wire(); wireLogs({type:"worker", cid:w.cid, cname:c.name, wid:id, wname:w.name}, w); wireFlags("worker", w); wireLine("worker", w);
   $("#editW").addEventListener("click", ()=> w.src==="own" ? viewWorkerForm(w, w.cid) : viewMemoForm(w,"worker"));
   const ph=$("#wphoto"); const PH_TTL=6*60*60*1000; S.photos=S.photos||{};
   if(w.src==="ref" && w.category){ const c0=S.photos[id];
