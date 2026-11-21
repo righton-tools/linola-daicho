@@ -267,8 +267,9 @@ const call = async (fn, ...args) => {
   if(!j.ok) throw new Error(j.error || "error"); return j.result;
 };
 async function resolveKey(){
-  if(!URL_KEY || KEY_DONE===URL_KEY) return;
-  try{ const nm = await call("resolveStaff", URL_KEY); if(nm){ staff = nm; try{ localStorage.setItem("linola.staff", nm); localStorage.setItem("linola.key", URL_KEY); }catch(e){} KEY_DONE = URL_KEY; const b=$("#staffName"); if(b) b.textContent = nm; } }catch(e){}
+  // 開くたびに、URLのキー（なければこの端末に覚えたキー）で担当者名を確かめ直す。名簿で名前を直しても自動でそろう
+  const k = URL_KEY || KEY_DONE; if(!k) return;
+  try{ const nm = await call("resolveStaff", k); if(nm){ staff = nm; try{ localStorage.setItem("linola.staff", nm); localStorage.setItem("linola.key", k); }catch(e){} KEY_DONE = k; const b=$("#staffName"); if(b) b.textContent = nm; } }catch(e){}
 }
 function applyData(d, fromCache){
   S.companies={}; S.workers={}; S.logs={};
