@@ -68,6 +68,11 @@ a{color:var(--accent);text-decoration:none}
 .pill.new{background:var(--crit);color:#fff}
 .pill.ef{background:#efe7fb;color:#5b3391}
 .pill.main{background:var(--surface2);color:var(--ink2)}
+.fixbar{display:flex;align-items:center;gap:8px;width:100%;border:0;border-radius:12px;padding:11px 14px;margin-bottom:10px;background:#9A6700;color:#fff;font-size:14px;font-weight:700;cursor:pointer;text-align:left;font-family:inherit}
+.fixbar .go{margin-left:auto;font-weight:500;font-size:12px;opacity:.9}
+.lrow .nm.wrap{white-space:normal;overflow:visible}
+.fixpick{margin:2px 0 10px}
+.fixpick .list{margin-top:6px}
 .pill.line{background:#e3f5e8;color:#1b7a38}
 .mainbox{margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}
 .mainbox label{display:flex;align-items:center;gap:10px;font-size:13px;font-weight:600;color:var(--ink2);white-space:nowrap}
@@ -274,7 +279,7 @@ async function resolveKey(){
 function applyData(d, fromCache){
   S.companies={}; S.workers={}; S.logs={};
   d.companies.forEach(c=>S.companies[c.id]=c); d.workers.forEach(w=>S.workers[w.id]=w); d.logs.forEach(l=>S.logs[l.id]=l);
-  S.refreshedAt=d.refreshedAt; S.fromCache=!!fromCache; S.ready=true; if(!fromCache) S.lastFetch=Date.now(); S.staffList=d.staffList||[]; S.flags=d.flags||[]; S.pre={}; (d.pre||[]).forEach(p=>S.pre[p.id]=p); S.preCands=d.preCands||[]; S.preSteps=d.preSteps||S.preSteps||[]; S.news=d.news||{items:[],seen:{}}; S.links=d.links||[]; setTimeout(updateNewsBadge,0);
+  S.refreshedAt=d.refreshedAt; S.fromCache=!!fromCache; S.ready=true; if(!fromCache) S.lastFetch=Date.now(); S.staffList=d.staffList||[]; S.flags=d.flags||[]; S.pre={}; (d.pre||[]).forEach(p=>S.pre[p.id]=p); S.preCands=d.preCands||[]; S.preSteps=d.preSteps||S.preSteps||[]; S.news=d.news||{items:[],seen:{}}; S.links=d.links||[]; S.orphans=d.orphans||[]; S.aliases=d.aliases||[]; setTimeout(updateNewsBadge,0);
   if(!staff && !S.pickerShown){ S.pickerShown=true; setTimeout(()=>openStaff(true),0); }
 }
 async function load(silent){
@@ -378,6 +383,7 @@ function render(){
   const r = route();
   $("#back").disabled = r.view==="home"||r.view==="pre"||r.view==="news"; syncTabs(r.view);
   if(!S.ready){ $("#main").innerHTML=`<div class="empty">読み込み中…</div>`; $("#title").innerHTML=`<span class="brand">Linola 特定技能</span>支援台帳`; return; }
+  if(r.view==="fix") return viewFix();
   if(r.view==="news") return viewNews();
   if(r.view==="pre"){ viewPre(); injectNewsBar(); return; }
   if(r.view==="prec") return viewPreCase(r.id);
@@ -400,9 +406,9 @@ function viewHome(){
   const soon = warn.filter(w=>exDays(w)<=30), warn90 = warn.filter(w=>exDays(w)>30), applyN = active.filter(applying);
   const fAll=all.map(followOf).filter(Boolean); const nFollow=fAll.length, nDue=fAll.filter(f=>f.days!==null&&f.days<=7).length;
   $("#main").innerHTML = `
-    ${entryBar()}
+    ${fixBar()}${entryBar()}
     <div class="summary s3">
-      <div class="tile"><b>${all.length}</b><span>受入企業数</span></div>
+      <div class="tile"><b>${(s=>all.filter(c=>s.has(c.id)).length)(new Set(active.map(w=>w.cid)))}</b><span>受入企業数</span></div>
       <div class="tile"><b>${entered.length}</b><span>入国在職中</span></div>
       <div class="tile"><b>${waiting.length}</b><span>入国待ち</span></div>
     </div>
@@ -420,7 +426,7 @@ function viewHome(){
     </div>
     <div class="empty" style="font-size:11.5px;padding:0 0 6px">絞り込みは複数選べます（都道府県は「どれか」、他は「すべて満たす」）</div>
     <div class="list" id="list"></div>
-    <div class="empty" style="font-size:12px">参照元の更新: ${esc(S.refreshedAt)}${S.fromCache?"（端末保存のデータ・更新中）":""} · <a href="#" id="reload">最新を読み込む</a></div>
+    <div class="empty" style="font-size:12px">参照元の更新: ${esc(S.refreshedAt)}${S.fromCache?"（端末保存のデータ・更新中）":""} · <a href="#" id="reload">最新を読み込む</a> · <a href="#/fix">名寄せ・ズレ確認</a></div>
     <button class="fab" data-go="#/newcompany">＋ 企業を追加</button>`;
   homeList();
   const qi=$("#q"); let composing=false;
@@ -449,7 +455,7 @@ function homeList(){
     if(has("pending") && !ws.some(w=>!w.retired && w.pending)) return false;
     if(has("retired") && !ws.some(w=>w.retired)) return false;
     if(has("active") && !ws.some(w=>!w.retired)) return false;
-    if(q){ const hay=[c.name,c.store,c.city,c.pref,c.contact,...ws.map(w=>w.name+w.kana)].join(" ").toLowerCase(); if(!hay.includes(q.toLowerCase())) return false; }
+    if(q){ const hay=[c.name,...(c.alt||[]),c.store,c.city,c.pref,c.contact,...ws.map(w=>w.name+w.kana)].join(" ").toLowerCase(); if(!hay.includes(q.toLowerCase())) return false; }
     return true;
   });
   if(has("follow")||has("due")) rows.sort((a,b)=>{ const fa=fmap[a.id], fb=fmap[b.id]; return ((fa.days??1e9)-(fb.days??1e9)) || (fb.level-fa.level); });
@@ -526,7 +532,7 @@ function viewCompany(id){
     ${flagSection("company", c)}
     ${lineSection("company", c)}
     <section class="sec"><div class="sec-h"><h2>企業情報${c.src==="ref"?"（Linola表より・参照のみ）":""}</h2></div><div class="card">
-      ${kv("受入店舗",c.store)}${kv("代表者",c.rep)}${kv("担当者",c.contact)}${kv("連絡先",c.tel,true)}${kv("メール",c.email,true)}${kv("勤務地",c.workplace)}${kv("支援費(税込)",c.fee,true)}${kv("補足メモ",c.memo)}
+      ${c.alt&&c.alt.length?kv("まとめた別名",c.alt.join("\n")):""}${kv("受入店舗",c.store)}${kv("代表者",c.rep)}${kv("担当者",c.contact)}${kv("連絡先",c.tel,true)}${kv("メール",c.email,true)}${kv("勤務地",c.workplace)}${kv("支援費(税込)",c.fee,true)}${kv("補足メモ",c.memo)}
     </div></section>
     <section class="sec"><div class="sec-h"><h2>所属の外国人</h2><button class="act" data-go="#/newworker/${encodeURIComponent(id)}">＋ 追加</button></div>
       <div class="list">${act.map(wrow).join("") || `<div class="empty">在職中の登録がありません</div>`}
@@ -619,6 +625,49 @@ function viewNews(){
   if(staff && un.size){ S.news.seen=Object.assign({}, S.news.seen, {[staff]:new Date().toISOString()}); updateNewsBadge(); call("markNewsSeen", staff).catch(()=>{}); }
 }
 
+// ---------- 名寄せ・ズレ確認（行き先のない記録を戻す／同じ会社の別名をまとめる。記録そのものは書き換えない） ----------
+const fixBar = () => (S.orphans||[]).length ? `<button type="button" class="fixbar">⚠ 行き先のない記録 ${S.orphans.length}件<span class="go">タップして直す ›</span></button>` : "";
+document.addEventListener("click", e=>{ if(e.target.closest && e.target.closest(".fixbar")) go("#/fix"); });
+function viewFix(){
+  $("#title").innerHTML=`<span class="brand">台帳の手入れ</span>名寄せ・ズレ確認`;
+  const orph=S.orphans||[], al=S.aliases||[]; const cName=id=>String((S.companies[id]||{}).name||"").replace(/\s+/g," ");
+  const moved=Object.values(S.workers).filter(w=>w.prevCid);
+  const picker=(id,label,ph)=>`<div class="fixpick"><label><span id="${id}l">${label}</span><input id="${id}q" placeholder="${ph}" autocomplete="off"></label><div class="list" id="${id}r"></div><div class="picked" id="${id}p">未選択</div></div>`;
+  $("#main").innerHTML=`
+    <div class="banner info">Linolaの表で社名や名前の書き方が変わると、前の名前に付けた記録が行き先を失います。ここで「同じもの」と教えると、元どおり表示されます。記録そのものは書き換えません（取り消せば元に戻ります）。</div>
+    <section class="sec" style="margin-top:0"><div class="sec-h"><h2>行き先のない記録${orph.length?` (${orph.length})`:""}</h2></div><div class="card">
+      ${orph.map((o,i)=>`<div class="lrow"><span class="nm wrap">${o.type==="worker"?"👤":"🏢"} ${esc(o.name)}<br><span class="lk">${esc(o.kinds)}${o.last?" · 最新 "+esc(String(o.last).slice(0,10)):""}</span></span><button class="btn" type="button" data-ofix="${i}">行き先を選ぶ</button></div>`).join("") || `<div class="empty" style="padding:6px 0">行き先のない記録はありません</div>`}
+    </div></section>
+    <section class="sec" id="fixSec"><div class="sec-h"><h2 id="fixH">同じ会社の別名をまとめる</h2></div><div class="card"><form class="f" id="af">
+      ${picker("fa","まとめたい会社（別名のほう）","会社名で検索")}
+      ${picker("fb","まとめ先（正式なほう）","会社名で検索")}
+      <label>メモ（任意）<input name="memo" placeholder="例：請求の表だけ施設名つき"></label>
+      <div class="btns"><button class="btn primary" type="submit">まとめる</button><button class="btn ghost" type="button" id="fixReset" hidden>やめる</button></div>
+    </form></div></section>
+    ${moved.length?`<section class="sec"><div class="sec-h"><h2>転職として扱っている人 (${moved.length})</h2></div><div class="card">${moved.map(w=>`<div class="lrow"><span class="nm wrap">👤 ${esc(w.name)}<br><span class="lk">${esc(cName(w.prevCid))} → ${esc(cName(w.cid))}（在職）</span></span></div>`).join("")}<div class="empty" style="font-size:11.5px;padding:6px 0 0;text-align:left">支援対象外リストと会社タブで会社名が違う人です。新しい会社で在職として数えています。書き方が違うだけの同じ会社なら、上で2社をまとめると退職の扱いになります。</div></div></section>`:""}
+    <section class="sec"><div class="sec-h"><h2>今の名寄せ${al.length?` (${al.length})`:""}</h2></div><div class="card">
+      ${al.map(a=>`<div class="lrow"><span class="nm wrap">${a.type==="worker"?"👤":"🏢"} ${esc(a.fromName||a.from)} → ${esc(a.toName||a.to)}<br><span class="lk">${esc(a.staff||"")} ${esc(String(a.at||"").slice(0,10))}${a.memo?" · "+esc(a.memo):""}</span></span><button class="del" type="button" data-adel="${esc(a.id)}">取消</button></div>`).join("") || `<div class="empty" style="padding:6px 0">まだありません</div>`}
+    </div></section>`;
+  let type="company", from=null, to=null; const nk=s=>String(s||"").toLowerCase().replace(/\s/g,"");
+  const cands=()=> type==="worker" ? Object.values(S.workers).filter(w=>!w.moved).map(w=>({id:w.id,name:w.name,sub:[cName(w.cid),w.birth,w.retired?"退職":""].filter(Boolean).join(" · ")})) : Object.values(S.companies).map(c=>({id:c.id,name:String(c.name).replace(/\s+/g," "),sub:[c.pref,c.city].filter(Boolean).join(" ")+" · 在職"+workersOf(c.id).filter(w=>!w.retired).length+"名"}));
+  const showPick=(id,x)=>{ $("#"+id+"p").innerHTML = x ? `選択中：<b>${esc(x.name)}</b>` : "未選択"; };
+  const wirePick=(id,set)=>{ $("#"+id+"q").addEventListener("input", e=>{ const k=nk(e.target.value); const r=k? cands().filter(x=>nk(x.name).includes(k)).slice(0,8) : []; const box=$("#"+id+"r");
+    box.innerHTML=r.map((x,i)=>`<button type="button" class="row" data-pk="${i}"><div class="body"><div class="t"><span class="nm">${esc(x.name)}</span></div><div class="s">${esc(x.sub)}</div></div></button>`).join("");
+    box.querySelectorAll("[data-pk]").forEach(b=>b.addEventListener("click", ()=>{ const x=r[Number(b.dataset.pk)]; set(x); showPick(id,x); box.innerHTML=""; $("#"+id+"q").value=""; })); }); };
+  wirePick("fa", x=>{ from=x; }); wirePick("fb", x=>{ to=x; });
+  document.querySelectorAll("[data-ofix]").forEach(b=>b.addEventListener("click", ()=>{ const o=orph[Number(b.dataset.ofix)]; type=o.type; from={id:o.id,name:o.name}; to=null; showPick("fa",from); showPick("fb",null);
+    $("#fixH").textContent=`「${o.name}」の記録の行き先を選ぶ`; $("#fal").textContent="行き先を失った名前"; $("#faq").hidden=true; $("#fbl").textContent= type==="worker" ? "今の台帳のどの人？" : "今の台帳のどの会社？"; $("#fbq").placeholder= type==="worker" ? "名前で検索" : "会社名で検索"; $("#fixReset").hidden=false; $("#fixSec").scrollIntoView({behavior:"smooth",block:"start"}); $("#fbq").focus(); }));
+  $("#fixReset").addEventListener("click", render);
+  $("#af").addEventListener("submit", async e=>{ e.preventDefault(); const key=URL_KEY||KEY_DONE; if(!key){ toast("自分用のURLから開いてください"); return; }
+    if(!from||!to){ toast("2つとも選んでください"); return; } if(from.id===to.id){ toast("同じもの同士はまとめられません"); return; }
+    if(!confirm(`「${from.name}」を「${to.name}」にまとめます。よろしいですか？\n（あとで取り消せます）`)) return;
+    const btn=e.target.querySelector("button[type=submit]"); btn.disabled=true; btn.textContent="保存中…";
+    try{ await call("addAlias", key, {type, from:from.id, fromName:from.name, to:to.id, toName:to.name, memo:(new FormData(e.target).get("memo")||"").trim()}); toast("まとめました"); await load(true); }
+    catch(err){ toast("保存に失敗: "+(err.message||err)); btn.disabled=false; btn.textContent="まとめる"; } });
+  document.querySelectorAll("[data-adel]").forEach(b=>b.addEventListener("click", async ()=>{ const key=URL_KEY||KEY_DONE; if(!key){ toast("自分用のURLから開いてください"); return; } if(!confirm("この名寄せを取り消しますか？（まとめる前の状態に戻ります）")) return; b.disabled=true;
+    try{ await call("deleteAlias", key, b.dataset.adel); toast("取り消しました"); await load(true); }catch(err){ toast("取消に失敗: "+(err.message||err)); b.disabled=false; } }));
+}
+
 function viewMemoForm(rec, type){
   $("#title").innerHTML=`<span class="brand">補足メモ</span>${esc(rec.name)}`;
   $("#main").innerHTML=`<div class="banner info">Linola表の元データは変更しません。ここで書いた内容は自社の履歴スプシに保存されます。</div>
@@ -668,7 +717,7 @@ function viewWorker(id){
   const n=exDays(w);
   $("#main").innerHTML=`
     <div class="hero"><div class="wphoto" id="wphoto"></div><h2>${esc(w.name)}</h2><div class="sub">${esc([w.kana,w.nationality,w.gender,w.age?w.age+"歳":""].filter(Boolean).join(" · "))}</div>
-      <div class="pills">${followPill(w.follow)}${entryPill(w)}${w.retired?`<span class="pill ret">退職${w.retireDate?" "+esc(w.retireDate):""}</span>`:w.pending?`<span class="pill warn">退職予定${w.retireDate?" "+esc(w.retireDate):""}</span>`:`<span class="pill ok">在職中</span>`}${w.jp?`<span class="pill acc">${esc(w.jp)}</span>`:""}${applying(w)&&!w.retired?'<span class="pill acc">申請中</span>':""}${n!==null&&!w.retired?(n<0?`<span class="pill crit">在留期限切れ</span>`:n<=90?`<span class="pill warn">在留期限まで${n}日</span>`:w.expiryUpdated?`<span class="pill ok">期限更新済（こちら入力）</span>`:""):""}</div>
+      <div class="pills">${followPill(w.follow)}${entryPill(w)}${w.prevCid?`<span class="pill acc">転職（前：${esc((S.companies[w.prevCid]||{}).name||"")}）</span>`:""}${w.retired?`<span class="pill ret">退職${w.retireDate?" "+esc(w.retireDate):""}</span>`:w.pending?`<span class="pill warn">退職予定${w.retireDate?" "+esc(w.retireDate):""}</span>`:`<span class="pill ok">在職中</span>`}${w.jp?`<span class="pill acc">${esc(w.jp)}</span>`:""}${applying(w)&&!w.retired?'<span class="pill acc">申請中</span>':""}${n!==null&&!w.retired?(n<0?`<span class="pill crit">在留期限切れ</span>`:n<=90?`<span class="pill warn">在留期限まで${n}日</span>`:w.expiryUpdated?`<span class="pill ok">期限更新済（こちら入力）</span>`:""):""}</div>
       <div class="btns">${telBtn(w.tel)}<button class="btn" id="editW">${w.src==="own"?"情報を編集":"補足メモ・状態"}</button><button class="btn" data-go="#/c/${encodeURIComponent(w.cid)}">企業ページへ</button></div>
     </div>
     ${(()=>{ const f=entryFollow(w); return f&&!f.done? `<div class="banner ef">🛬 入国から${f.days}日。<b>${esc(f.label)}</b>の声かけ時期です。不安や困りごとを聞いて、対応履歴を追加すると通知が消えます。</div>` : ""; })()}
