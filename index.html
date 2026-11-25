@@ -68,9 +68,12 @@ a{color:var(--accent);text-decoration:none}
 .pill.new{background:var(--crit);color:#fff}
 .pill.ef{background:#efe7fb;color:#5b3391}
 .pill.pre{background:#e4ecfb;color:#2a4fa3}
-.seg{display:flex;margin:0 0 8px;border:1px solid var(--line);border-radius:10px;overflow:hidden}
-.seg button{flex:1;border:0;background:var(--surface);color:var(--ink2);font:inherit;font-size:13.5px;font-weight:600;padding:9px 0;cursor:pointer}
-.seg button.on{background:var(--accent);color:var(--accent-ink)}
+.rbar{display:flex;align-items:center;gap:8px;margin:2px 0 8px}
+.rbar .cnt{flex:1;min-width:0;padding:0 2px;font-weight:600}
+.hmode{display:inline-flex;flex:none;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.hmode button{border:0;background:var(--surface);color:var(--ink2);font:inherit;font-size:12.5px;font-weight:600;padding:7px 13px;cursor:pointer;white-space:nowrap}
+.hmode button.on{background:var(--accent);color:var(--accent-ink)}
+.row .hit{margin-top:3px;font-size:12px;font-weight:700;color:var(--accent)}
 .cnt{font-size:12px;color:var(--ink2);padding:0 2px 6px}
 .row .n .sm{display:block;font-size:11px;color:var(--muted);white-space:nowrap}
 .pill.main{background:var(--surface2);color:var(--ink2)}
@@ -319,6 +322,9 @@ const isPre = w => !w.retired && ((!w.entry && !w.cardNo) || (daysTo(w.entry)||0
 const isWork = w => !w.retired && !isPre(w);
 const wState = w => w.retired ? "retired" : isPre(w) ? "pre" : "work";
 const statePill = w => w.retired ? "" : isPre(w) ? `<span class="pill pre">入国前</span>` : `<span class="pill ok">在職</span>`;
+const HIT = { entry:["入国フォロー", w=>{ const f=entryFollow(w); return !!(f&&!f.done); }], active:["在職", w=>isWork(w)], pre:["入国前", w=>isPre(w)],
+  expired:["期限切れ", w=>{ const n=exDays(w); return !w.retired && n!==null && n<0; }], warn:["90日以内", w=>{ const n=exDays(w); return !w.retired && n!==null && n>=0 && n<=90; }], warn30:["30日以内", w=>{ const n=exDays(w); return !w.retired && n!==null && n>=0 && n<=30; }],
+  apply:["申請中", w=>!w.retired && applying(w)], pending:["退職予定", w=>!w.retired && !!w.pending], retired:["退職", w=>!!w.retired] };
 const HOME_FLAGS = { c:["entry","follow","due","active","pre","expired","warn","warn30","apply","pending","retired","mine","nomain"], w:["work","pre","retired","entry","follow","due","expired","warn","warn30","apply","pending","mine"] };
 const workersOf = cid => Object.values(S.workers).filter(w=>w.cid===cid).sort((a,b)=> (a.retired-b.retired) || (isPre(a)-isPre(b)) || a.name.localeCompare(b.name));
 const setStaff = v => { staff=v; try{localStorage.setItem("linola.staff",staff);}catch(e){} };
@@ -432,7 +438,6 @@ function viewHome(){
       <div class="tile ${applyN.length?"acc":""}"><b>${applyN.length}</b><span>申請中</span></div>
       <div class="tile ${expired.length?"crit":""}"><b>${expired.length}</b><span>期限切れ</span></div>
     </div>
-    <div class="seg"><button type="button" data-mode="c" class="${filt.mode!=="w"?"on":""}">企業ごと</button><button type="button" data-mode="w" class="${filt.mode==="w"?"on":""}">個人ごと</button></div>
     <div class="search"><input id="q" type="search" placeholder="${filt.mode==="w"?"外国人名・フリガナ・企業名で検索":"企業名・店舗・外国人名で検索"}" value="${esc(filt.q)}" autocomplete="off"></div>
     <div class="chips">
       <button class="chip ${!filt.flags.length&&!filt.prefs.length?"on":""}" data-clear="1">すべて</button>
@@ -440,7 +445,7 @@ function viewHome(){
       ${prefs.map(p=>`<button class="chip pref ${filt.prefs.includes(p)?"on":""}" data-pref="${esc(p)}">${esc(p)}</button>`).join("")}
     </div>
     <div class="empty" style="font-size:11.5px;padding:0 0 6px">絞り込みは複数選べます（都道府県${filt.mode==="w"?"と「在職・入国前・退職」":""}は「どれか」、他は「すべて満たす」）</div>
-    <div class="cnt" id="cnt"></div>
+    <div class="rbar"><div class="cnt" id="cnt"></div><div class="hmode"><button type="button" data-mode="c" class="${filt.mode!=="w"?"on":""}">企業別</button><button type="button" data-mode="w" class="${filt.mode==="w"?"on":""}">個人別</button></div></div>
     <div class="list" id="list"></div>
     <div class="empty" style="font-size:12px">参照元の更新: ${esc(S.refreshedAt)}${S.fromCache?"（端末保存のデータ・更新中）":""} · <a href="#" id="reload">最新を読み込む</a> · <a href="#/fix">名寄せ・ズレ確認</a></div>
     <button class="fab" data-go="#/newcompany">＋ 企業を追加</button>`;
@@ -449,7 +454,8 @@ function viewHome(){
   qi.addEventListener("compositionstart", ()=>{ composing=true; });
   qi.addEventListener("compositionend", e=>{ composing=false; filt.q=e.target.value; homeList(); });
   qi.addEventListener("input", e=>{ if(composing) return; filt.q=e.target.value; homeList(); });
-  document.querySelectorAll(".seg [data-mode]").forEach(b=>b.addEventListener("click", ()=>{ const m=b.dataset.mode; if(m===filt.mode) return; filt.mode=m; filt.flags=filt.flags.filter(k=>HOME_FLAGS[m].includes(k)); try{ localStorage.setItem("linola.homemode", m); }catch(e){} render(); }));
+  document.querySelectorAll(".hmode [data-mode]").forEach(b=>b.addEventListener("click", ()=>{ const m=b.dataset.mode; if(m===filt.mode) return; filt.mode=m; filt.flags=filt.flags.filter(k=>HOME_FLAGS[m].includes(k)); try{ localStorage.setItem("linola.homemode", m); }catch(e){}
+    const y=window.scrollY; render(); window.scrollTo(0,y); const ch=document.querySelector(".chips"), on=document.querySelector(".chips .chip.on:not([data-clear])"); if(ch&&on) ch.scrollLeft=Math.max(0, on.offsetLeft-ch.offsetLeft-40); }));
   $("#reload").addEventListener("click", async e=>{ e.preventDefault(); toast("参照元を再読み込み中…"); try{ await call("refreshReference"); }catch(_){} load(true); });
   wire();
 }
@@ -481,9 +487,10 @@ function homeList(){
   if(has("follow")||has("due")) rows.sort((a,b)=>{ const fa=fmap[a.id], fb=fmap[b.id]; return ((fa.days??1e9)-(fb.days??1e9)) || (fb.level-fa.level); });
   // 30日以内：期限がいちばん近い人がいる会社から順に
   if(has("warn30") && !has("follow") && !has("due")){ const md=c=>Math.min(1e9,...workersOf(c.id).filter(w=>!w.retired).map(exDays).filter(n=>n!==null&&n>=0)); rows.sort((a,b)=>md(a)-md(b)); }
-  const cnt=$("#cnt"); if(cnt) cnt.textContent=`${rows.length}社`;
+  const pk=filt.flags.filter(k=>HIT[k]); const hitN=(c,k)=>workersOf(c.id).filter(HIT[k][1]).length;
+  const cnt=$("#cnt"); if(cnt) cnt.textContent=`${rows.length}社`+(pk.length?`（${pk.map(k=>`${HIT[k][0]} ${rows.reduce((s,c)=>s+hitN(c,k),0)}名`).join("・")}）`:"");
   el.innerHTML = rows.map(c=>{ const ws=workersOf(c.id); const act=ws.filter(isWork).length, npre=ws.filter(isPre).length, nret=ws.filter(w=>w.retired).length; const wl=lastLog(l=>l.cid===c.id); const hasExp=ws.some(w=>{const n=exDays(w); return !w.retired&&n!==null&&n<0;}); const hasWarn=!hasExp&&ws.some(w=>{const n=exDays(w); return !w.retired&&n!==null&&n<=90;});
-        return `<button class="row" data-go="#/c/${encodeURIComponent(c.id)}"><div class="body"><div class="t"><span class="nm">${esc(c.name)}</span>${followPill(fmap[c.id])}${mainPill(c)}${flagPill("company",c.id)}${ws.some(w=>{const f=entryFollow(w); return f&&!f.done;})?'<span class="pill ef">入国フォロー</span>':""}${hasExp?'<span class="pill crit">期限切れ</span>':hasWarn?'<span class="pill warn">期限注意</span>':""}${c.src==="own"?'<span class="pill acc">追加</span>':""}</div><div class="s">${esc([c.pref,c.city].filter(Boolean).join(" "))}${c.store?" · "+esc(c.store):""}${wl?" · 最終対応 "+esc(wl.date):""}</div></div><div class="n"><b>${act}</b>在職${npre||nret?`<span class="sm">${[npre?`入国前${npre}`:"",nret?`退職${nret}`:""].filter(Boolean).join("・")}</span>`:""}</div></button>`; }).join("") || `<div class="empty">該当する企業がありません</div>`;
+        return `<button class="row" data-go="#/c/${encodeURIComponent(c.id)}"><div class="body"><div class="t"><span class="nm">${esc(c.name)}</span>${followPill(fmap[c.id])}${mainPill(c)}${flagPill("company",c.id)}${ws.some(w=>{const f=entryFollow(w); return f&&!f.done;})?'<span class="pill ef">入国フォロー</span>':""}${hasExp?'<span class="pill crit">期限切れ</span>':hasWarn?'<span class="pill warn">期限注意</span>':""}${c.src==="own"?'<span class="pill acc">追加</span>':""}</div><div class="s">${esc([c.pref,c.city].filter(Boolean).join(" "))}${c.store?" · "+esc(c.store):""}${wl?" · 最終対応 "+esc(wl.date):""}</div>${pk.length?`<div class="hit">${pk.map(k=>`${HIT[k][0]} ${hitN(c,k)}名`).join("・")}</div>`:""}</div><div class="n"><b>${act}</b>在職${npre||nret?`<span class="sm">${[npre?`入国前${npre}`:"",nret?`退職${nret}`:""].filter(Boolean).join("・")}</span>`:""}</div></button>`; }).join("") || `<div class="empty">該当する企業がありません</div>`;
   el.querySelectorAll("[data-go]").forEach(b=>b.addEventListener("click", ()=>go(b.dataset.go)));
 }
 // 個人ごとの一覧。在職・入国前・退職はどれか（選ばなければ在職＋入国前。名前で検索した時は退職も出す）
