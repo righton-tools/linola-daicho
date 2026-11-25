@@ -67,6 +67,12 @@ a{color:var(--accent);text-decoration:none}
 .newsbar .go{margin-left:auto;font-weight:500;font-size:12px;opacity:.9}
 .pill.new{background:var(--crit);color:#fff}
 .pill.ef{background:#efe7fb;color:#5b3391}
+.pill.pre{background:#e4ecfb;color:#2a4fa3}
+.seg{display:flex;margin:0 0 8px;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{flex:1;border:0;background:var(--surface);color:var(--ink2);font:inherit;font-size:13.5px;font-weight:600;padding:9px 0;cursor:pointer}
+.seg button.on{background:var(--accent);color:var(--accent-ink)}
+.cnt{font-size:12px;color:var(--ink2);padding:0 2px 6px}
+.row .n .sm{display:block;font-size:11px;color:var(--muted);white-space:nowrap}
 .pill.main{background:var(--surface2);color:var(--ink2)}
 .fixbar{display:flex;align-items:center;gap:8px;width:100%;border:0;border-radius:12px;padding:11px 14px;margin-bottom:10px;background:#9A6700;color:#fff;font-size:14px;font-weight:700;cursor:pointer;text-align:left;font-family:inherit}
 .fixbar .go{margin-left:auto;font-weight:500;font-size:12px;opacity:.9}
@@ -308,7 +314,13 @@ const expiryPill = w => { if(w.retired) return `<span class="pill ret">退職</s
 const toast = m => { const t=$("#toast"); t.textContent=m; t.classList.add("show"); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove("show"),2000); };
 const sortLogs = arr => arr.sort((a,b)=> (b.date||"").localeCompare(a.date||"") || (b.createdAt||"").localeCompare(a.createdAt||""));
 const lastLog = pred => { const l=Object.values(S.logs).filter(pred); return l.length? sortLogs(l)[0] : null; };
-const workersOf = cid => Object.values(S.workers).filter(w=>w.cid===cid).sort((a,b)=> (a.retired-b.retired) || a.name.localeCompare(b.name));
+// 状態の決まり：入国前＝退職していなくて、入国日も在留カードも空（または入国日が先の日付）。在職＝すでに国内で働いている人。退職＝退職・支援対象外
+const isPre = w => !w.retired && ((!w.entry && !w.cardNo) || (daysTo(w.entry)||0) > 0);
+const isWork = w => !w.retired && !isPre(w);
+const wState = w => w.retired ? "retired" : isPre(w) ? "pre" : "work";
+const statePill = w => w.retired ? "" : isPre(w) ? `<span class="pill pre">入国前</span>` : `<span class="pill ok">在職</span>`;
+const HOME_FLAGS = { c:["entry","follow","due","active","pre","expired","warn","warn30","apply","pending","retired","mine","nomain"], w:["work","pre","retired","entry","follow","due","expired","warn","warn30","apply","pending","mine"] };
+const workersOf = cid => Object.values(S.workers).filter(w=>w.cid===cid).sort((a,b)=> (a.retired-b.retired) || (isPre(a)-isPre(b)) || a.name.localeCompare(b.name));
 const setStaff = v => { staff=v; try{localStorage.setItem("linola.staff",staff);}catch(e){} };
 const toISO = s => { const d=parseDate(s); return d? `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}` : ""; };
 const followOf = c => { const list=[c.follow, ...workersOf(c.id).map(w=>w.follow)].filter(f=>f&&f.open).map(f=>Object.assign({}, f, {days:daysTo(f.next)})); if(!list.length) return null; list.sort((a,b)=>((a.days??1e9)-(b.days??1e9)) || (b.level-a.level)); return list[0]; };
@@ -377,7 +389,7 @@ function openStaff(first){
 }
 
 // ---------- views ----------
-let filt = {q:"", prefs:[], flags:[]};
+let filt = {q:"", prefs:[], flags:[], mode:(()=>{ try{ return localStorage.getItem("linola.homemode")==="w"?"w":"c"; }catch(e){ return "c"; } })()};
 function render(){
   $("#staffName").textContent = staff || "担当者未設定";
   const r = route();
@@ -402,29 +414,33 @@ function viewHome(){
   const active = Object.values(S.workers).filter(w=>!w.retired);
   const expired = active.filter(w=>{const n=exDays(w); return n!==null && n<0;});
   const warn = active.filter(w=>{const n=exDays(w); return n!==null && n>=0 && n<=90;});
-  const entered = active.filter(w=>w.entry||w.cardNo), waiting = active.filter(w=>!w.entry&&!w.cardNo);
+  const entered = active.filter(isWork), waiting = active.filter(isPre);
+  const cWork = new Set(entered.map(w=>w.cid)), cPreOnly = all.filter(c=>!cWork.has(c.id) && waiting.some(w=>w.cid===c.id)).length;
   const soon = warn.filter(w=>exDays(w)<=30), warn90 = warn.filter(w=>exDays(w)>30), applyN = active.filter(applying);
   const fAll=all.map(followOf).filter(Boolean); const nFollow=fAll.length, nDue=fAll.filter(f=>f.days!==null&&f.days<=7).length;
   $("#main").innerHTML = `
     ${fixBar()}${entryBar()}
     <div class="summary s3">
-      <div class="tile"><b>${(s=>all.filter(c=>s.has(c.id)).length)(new Set(active.map(w=>w.cid)))}</b><span>受入企業数</span></div>
-      <div class="tile"><b>${entered.length}</b><span>入国在職中</span></div>
-      <div class="tile"><b>${waiting.length}</b><span>入国待ち</span></div>
+      <div class="tile"><b>${all.filter(c=>cWork.has(c.id)).length}</b><span>受入企業数</span></div>
+      <div class="tile"><b>${entered.length}</b><span>在職者</span></div>
+      <div class="tile"><b>${waiting.length}</b><span>入国前</span></div>
     </div>
+    <div class="cnt">在職者＝すでに国内で働いている人。入国前・退職（支援対象外）は入れていません。${cPreOnly?`入国前の人だけの企業 ${cPreOnly}社は、受入企業数に入れていません。`:""}</div>
     <div class="summary last">
       <div class="tile ${warn90.length?"warn":""}"><b>${warn90.length}</b><span>90日以内</span></div>
       <div class="tile ${soon.length?"warn":""}"><b>${soon.length}</b><span>30日以内</span></div>
       <div class="tile ${applyN.length?"acc":""}"><b>${applyN.length}</b><span>申請中</span></div>
       <div class="tile ${expired.length?"crit":""}"><b>${expired.length}</b><span>期限切れ</span></div>
     </div>
-    <div class="search"><input id="q" type="search" placeholder="企業名・店舗・外国人名で検索" value="${esc(filt.q)}" autocomplete="off"></div>
+    <div class="seg"><button type="button" data-mode="c" class="${filt.mode!=="w"?"on":""}">企業ごと</button><button type="button" data-mode="w" class="${filt.mode==="w"?"on":""}">個人ごと</button></div>
+    <div class="search"><input id="q" type="search" placeholder="${filt.mode==="w"?"外国人名・フリガナ・企業名で検索":"企業名・店舗・外国人名で検索"}" value="${esc(filt.q)}" autocomplete="off"></div>
     <div class="chips">
       <button class="chip ${!filt.flags.length&&!filt.prefs.length?"on":""}" data-clear="1">すべて</button>
-      ${[["entry","入国フォロー"+(entryList().length?` ${entryList().length}`:"")],["follow","対応中"+(nFollow?` ${nFollow}`:"")],["due","対応期限7日以内"+(nDue?` ${nDue}`:"")],["active","在職者あり"],["expired","期限切れ"],["warn","90日以内"],["warn30","30日以内"],["apply","申請中"],["pending","退職予定"],["retired","退職者あり"],["mine","メインが自分"],["nomain","メイン未設定"]].map(([k,l])=>`<button class="chip ${filt.flags.includes(k)?"on":""}" data-flag="${k}">${l}</button>`).join("")}
+      ${[["entry","入国フォロー"+(entryList().length?` ${entryList().length}`:"")],["follow","対応中"+(nFollow?` ${nFollow}`:"")],["due","対応期限7日以内"+(nDue?` ${nDue}`:"")],["active","在職者あり"],["work","在職"],["pre",filt.mode==="w"?"入国前":"入国前あり"],["expired","期限切れ"],["warn","90日以内"],["warn30","30日以内"],["apply","申請中"],["pending","退職予定"],["retired",filt.mode==="w"?"退職":"退職者あり"],["mine","メインが自分"],["nomain","メイン未設定"]].filter(([k])=>HOME_FLAGS[filt.mode==="w"?"w":"c"].includes(k)).sort((a,b)=>{ const o=HOME_FLAGS[filt.mode==="w"?"w":"c"]; return o.indexOf(a[0])-o.indexOf(b[0]); }).map(([k,l])=>`<button class="chip ${filt.flags.includes(k)?"on":""}" data-flag="${k}">${l}</button>`).join("")}
       ${prefs.map(p=>`<button class="chip pref ${filt.prefs.includes(p)?"on":""}" data-pref="${esc(p)}">${esc(p)}</button>`).join("")}
     </div>
-    <div class="empty" style="font-size:11.5px;padding:0 0 6px">絞り込みは複数選べます（都道府県は「どれか」、他は「すべて満たす」）</div>
+    <div class="empty" style="font-size:11.5px;padding:0 0 6px">絞り込みは複数選べます（都道府県${filt.mode==="w"?"と「在職・入国前・退職」":""}は「どれか」、他は「すべて満たす」）</div>
+    <div class="cnt" id="cnt"></div>
     <div class="list" id="list"></div>
     <div class="empty" style="font-size:12px">参照元の更新: ${esc(S.refreshedAt)}${S.fromCache?"（端末保存のデータ・更新中）":""} · <a href="#" id="reload">最新を読み込む</a> · <a href="#/fix">名寄せ・ズレ確認</a></div>
     <button class="fab" data-go="#/newcompany">＋ 企業を追加</button>`;
@@ -433,11 +449,13 @@ function viewHome(){
   qi.addEventListener("compositionstart", ()=>{ composing=true; });
   qi.addEventListener("compositionend", e=>{ composing=false; filt.q=e.target.value; homeList(); });
   qi.addEventListener("input", e=>{ if(composing) return; filt.q=e.target.value; homeList(); });
+  document.querySelectorAll(".seg [data-mode]").forEach(b=>b.addEventListener("click", ()=>{ const m=b.dataset.mode; if(m===filt.mode) return; filt.mode=m; filt.flags=filt.flags.filter(k=>HOME_FLAGS[m].includes(k)); try{ localStorage.setItem("linola.homemode", m); }catch(e){} render(); }));
   $("#reload").addEventListener("click", async e=>{ e.preventDefault(); toast("参照元を再読み込み中…"); try{ await call("refreshReference"); }catch(_){} load(true); });
   wire();
 }
 function homeList(){
   const el=$("#list"); if(!el) return;
+  if(filt.mode==="w") return homeListW(el);
   const all = Object.values(S.companies).sort((a,b)=>a.name.localeCompare(b.name,"ja"));
   const q=filt.q.trim();
   const has=k=>filt.flags.includes(k); const fmap={};
@@ -455,15 +473,46 @@ function homeList(){
     if(has("expired") && !ws.some(w=>{const n=exDays(w); return !w.retired && n!==null && n<0;})) return false;
     if(has("pending") && !ws.some(w=>!w.retired && w.pending)) return false;
     if(has("retired") && !ws.some(w=>w.retired)) return false;
-    if(has("active") && !ws.some(w=>!w.retired)) return false;
+    if(has("active") && !ws.some(isWork)) return false;
+    if(has("pre") && !ws.some(isPre)) return false;
     if(q){ const hay=[c.name,...(c.alt||[]),c.store,c.city,c.pref,c.contact,...ws.map(w=>w.name+w.kana)].join(" ").toLowerCase(); if(!hay.includes(q.toLowerCase())) return false; }
     return true;
   });
   if(has("follow")||has("due")) rows.sort((a,b)=>{ const fa=fmap[a.id], fb=fmap[b.id]; return ((fa.days??1e9)-(fb.days??1e9)) || (fb.level-fa.level); });
   // 30日以内：期限がいちばん近い人がいる会社から順に
   if(has("warn30") && !has("follow") && !has("due")){ const md=c=>Math.min(1e9,...workersOf(c.id).filter(w=>!w.retired).map(exDays).filter(n=>n!==null&&n>=0)); rows.sort((a,b)=>md(a)-md(b)); }
-  el.innerHTML = rows.map(c=>{ const ws=workersOf(c.id); const act=ws.filter(w=>!w.retired).length; const wl=lastLog(l=>l.cid===c.id); const hasExp=ws.some(w=>{const n=exDays(w); return !w.retired&&n!==null&&n<0;}); const hasWarn=!hasExp&&ws.some(w=>{const n=exDays(w); return !w.retired&&n!==null&&n<=90;});
-        return `<button class="row" data-go="#/c/${encodeURIComponent(c.id)}"><div class="body"><div class="t"><span class="nm">${esc(c.name)}</span>${followPill(fmap[c.id])}${mainPill(c)}${flagPill("company",c.id)}${ws.some(w=>{const f=entryFollow(w); return f&&!f.done;})?'<span class="pill ef">入国フォロー</span>':""}${hasExp?'<span class="pill crit">期限切れ</span>':hasWarn?'<span class="pill warn">期限注意</span>':""}${c.src==="own"?'<span class="pill acc">追加</span>':""}</div><div class="s">${esc([c.pref,c.city].filter(Boolean).join(" "))}${c.store?" · "+esc(c.store):""}${wl?" · 最終対応 "+esc(wl.date):""}</div></div><div class="n"><b>${act}</b>名${ws.length-act?`<span style="color:var(--muted)">/退${ws.length-act}</span>`:""}</div></button>`; }).join("") || `<div class="empty">該当する企業がありません</div>`;
+  const cnt=$("#cnt"); if(cnt) cnt.textContent=`${rows.length}社`;
+  el.innerHTML = rows.map(c=>{ const ws=workersOf(c.id); const act=ws.filter(isWork).length, npre=ws.filter(isPre).length, nret=ws.filter(w=>w.retired).length; const wl=lastLog(l=>l.cid===c.id); const hasExp=ws.some(w=>{const n=exDays(w); return !w.retired&&n!==null&&n<0;}); const hasWarn=!hasExp&&ws.some(w=>{const n=exDays(w); return !w.retired&&n!==null&&n<=90;});
+        return `<button class="row" data-go="#/c/${encodeURIComponent(c.id)}"><div class="body"><div class="t"><span class="nm">${esc(c.name)}</span>${followPill(fmap[c.id])}${mainPill(c)}${flagPill("company",c.id)}${ws.some(w=>{const f=entryFollow(w); return f&&!f.done;})?'<span class="pill ef">入国フォロー</span>':""}${hasExp?'<span class="pill crit">期限切れ</span>':hasWarn?'<span class="pill warn">期限注意</span>':""}${c.src==="own"?'<span class="pill acc">追加</span>':""}</div><div class="s">${esc([c.pref,c.city].filter(Boolean).join(" "))}${c.store?" · "+esc(c.store):""}${wl?" · 最終対応 "+esc(wl.date):""}</div></div><div class="n"><b>${act}</b>在職${npre||nret?`<span class="sm">${[npre?`入国前${npre}`:"",nret?`退職${nret}`:""].filter(Boolean).join("・")}</span>`:""}</div></button>`; }).join("") || `<div class="empty">該当する企業がありません</div>`;
+  el.querySelectorAll("[data-go]").forEach(b=>b.addEventListener("click", ()=>go(b.dataset.go)));
+}
+// 個人ごとの一覧。在職・入国前・退職はどれか（選ばなければ在職＋入国前。名前で検索した時は退職も出す）
+function homeListW(el){
+  const q=filt.q.trim().toLowerCase(); const has=k=>filt.flags.includes(k); const st=["work","pre","retired"].filter(has);
+  let rows=Object.values(S.workers).filter(w=>{ if(w.moved) return false; const c=S.companies[w.cid]||{}; const s=wState(w); const live=s!=="retired"; const n=exDays(w);
+    if(st.length ? !st.includes(s) : (!live && !q)) return false;
+    if(filt.prefs.length && !filt.prefs.includes(c.pref)) return false;
+    if(has("expired") && !(live && n!==null && n<0)) return false;
+    if(has("warn") && !(live && n!==null && n>=0 && n<=90)) return false;
+    if(has("warn30") && !(live && n!==null && n>=0 && n<=30)) return false;
+    if(has("apply") && !(live && applying(w))) return false;
+    if(has("pending") && !(live && w.pending)) return false;
+    if(has("entry")){ const f=entryFollow(w); if(!(f&&!f.done)) return false; }
+    if(has("follow") && !(w.follow&&w.follow.open)) return false;
+    if(has("due")){ const d=w.follow&&w.follow.open?daysTo(w.follow.next):null; if(!(d!==null&&d<=7)) return false; }
+    if(has("mine") && !(staff && c.main===staff)) return false;
+    if(q){ const hay=[w.name,w.kana,w.nationality,c.name,...(c.alt||[]),c.store,c.city,c.pref].join(" ").toLowerCase(); if(!hay.includes(q)) return false; }
+    return true; });
+  const cn=w=>String((S.companies[w.cid]||{}).name||""); const ex=w=>{ const n=exDays(w); return n===null?1e9:n; }; const fd=w=>{ const d=w.follow&&w.follow.open?daysTo(w.follow.next):null; return d===null?1e9:d; };
+  const byName=(a,b)=>cn(a).localeCompare(cn(b),"ja") || a.name.localeCompare(b.name);
+  if(has("follow")||has("due")) rows.sort((a,b)=>(fd(a)-fd(b)) || byName(a,b));
+  else if(has("expired")||has("warn")||has("warn30")) rows.sort((a,b)=>(ex(a)-ex(b)) || byName(a,b));
+  else rows.sort(byName);
+  const k={work:0,pre:0,retired:0}; rows.forEach(w=>k[wState(w)]++);
+  const cnt=$("#cnt"); if(cnt) cnt.textContent=`${rows.length}名（在職 ${k.work}・入国前 ${k.pre}${k.retired?`・退職 ${k.retired}`:""}）`;
+  const MAX=400;
+  el.innerHTML = rows.slice(0,MAX).map(w=>{ const c=S.companies[w.cid]||{};
+    return `<button class="row" data-go="#/w/${encodeURIComponent(w.id)}"><div class="body"><div class="t"><span class="nm">${esc(w.name)}</span>${statePill(w)}${followPill(w.follow)}${flagPill("worker",w.id)}${entryPill(w)}${expiryPill(w)}</div><div class="s">${esc(c.name||"（企業なし）")}${w.nationality?" · "+esc(w.nationality):""}${w.entry?" · 入国 "+esc(w.entry):""}</div></div><div class="n">›</div></button>`; }).join("") + (rows.length>MAX?`<div class="empty">多いので先頭${MAX}名だけ表示しています。検索か絞り込みで減らしてください</div>`:"") || `<div class="empty">該当する人がいません</div>`;
   el.querySelectorAll("[data-go]").forEach(b=>b.addEventListener("click", ()=>go(b.dataset.go)));
 }
 
@@ -523,11 +572,11 @@ function wireLogs(base, rec){
 function viewCompany(id){
   const c=S.companies[id]; if(!c){ $("#main").innerHTML=`<div class="empty">企業が見つかりません</div>`; return; }
   $("#title").innerHTML=`<span class="brand">受入企業</span>${esc(c.name)}`;
-  const ws=workersOf(id); const act=ws.filter(w=>!w.retired), ret=ws.filter(w=>w.retired);
+  const ws=workersOf(id); const act=ws.filter(isWork), pre=ws.filter(isPre), ret=ws.filter(w=>w.retired);
   const wrow = w => `<button class="row" data-go="#/w/${encodeURIComponent(w.id)}"><div class="body"><div class="t"><span class="nm">${esc(w.name)}</span>${followPill(w.follow)}${flagPill("worker",w.id)}${entryPill(w)}${expiryPill(w)}</div><div class="s">${esc([w.kana,w.nationality,w.jp].filter(Boolean).join(" · "))}${w.entry?" · 入国 "+esc(w.entry):""}</div></div><div class="n">›</div></button>`;
   $("#main").innerHTML = `
     <div class="hero"><h2>${esc(c.name)}</h2><div class="sub">${esc([c.pref,c.city].filter(Boolean).join(" "))}${c.field?" · "+esc(c.field):""}${c.category?" · "+esc(c.category):""}</div>
-      <div class="pills">${followPill(c.follow)}<span class="pill acc">在職 ${act.length}名</span>${ret.length?`<span class="pill ret">退職 ${ret.length}名</span>`:""}${c.fee?`<span class="pill ok">支援費 ${esc(c.fee)}</span>`:""}</div>
+      <div class="pills">${followPill(c.follow)}<span class="pill acc">在職 ${act.length}名</span>${pre.length?`<span class="pill pre">入国前 ${pre.length}名</span>`:""}${ret.length?`<span class="pill ret">退職 ${ret.length}名</span>`:""}${c.fee?`<span class="pill ok">支援費 ${esc(c.fee)}</span>`:""}</div>
       <div class="mainbox"><label>メイン担当<select id="mainSel"><option value="">（未設定）</option>${[...new Set([...(S.staffList||[]), ...(c.main?[c.main]:[])])].map(n=>`<option value="${esc(n)}" ${n===c.main?"selected":""}>${esc(n)}</option>`).join("")}</select></label>
         <div class="note">窓口の目安です（責任はチーム全員で持ちます）。${(()=>{ if(c.main) return ""; const l=lastLog(x=>x.cid===id&&(S.staffList||[]).includes(x.staff)); return l? ` 最近対応：<b>${esc(l.staff)}</b>（${esc(l.date)}）` : ""; })()}</div></div>
       <div class="btns">${telBtn(c.tel)}<button class="btn" id="editC">${c.src==="own"?"情報を編集":"補足メモを編集"}</button></div>
@@ -538,7 +587,8 @@ function viewCompany(id){
       ${c.alt&&c.alt.length?kv("まとめた別名",c.alt.join("\n")):""}${kv("受入店舗",c.store)}${kv("代表者",c.rep)}${kv("担当者",c.contact)}${kv("連絡先",c.tel,true)}${kv("メール",c.email,true)}${kv("勤務地",c.workplace)}${kv("支援費(税込)",c.fee,true)}${kv("補足メモ",c.memo)}
     </div></section>
     <section class="sec"><div class="sec-h"><h2>所属の外国人</h2><button class="act" data-go="#/newworker/${encodeURIComponent(id)}">＋ 追加</button></div>
-      <div class="list">${act.map(wrow).join("") || `<div class="empty">在職中の登録がありません</div>`}
+      <div class="list">${act.map(wrow).join("") || `<div class="empty">在職中の人はいません</div>`}
+      ${pre.length?`<div class="wgroup">入国前</div>${pre.map(wrow).join("")}`:""}
       ${ret.length?`<div class="wgroup">退職者</div>${ret.map(wrow).join("")}`:""}</div>
     </section>
     ${logSection("company", l=>l.cid===id, c)}`;
@@ -720,7 +770,7 @@ function viewWorker(id){
   const n=exDays(w);
   $("#main").innerHTML=`
     <div class="hero"><div class="wphoto" id="wphoto"></div><h2>${esc(w.name)}</h2><div class="sub">${esc([w.kana,w.nationality,w.gender,w.age?w.age+"歳":""].filter(Boolean).join(" · "))}</div>
-      <div class="pills">${followPill(w.follow)}${entryPill(w)}${w.prevCid?`<span class="pill acc">転職（前：${esc((S.companies[w.prevCid]||{}).name||"")}）</span>`:""}${w.retired?`<span class="pill ret">退職${w.retireDate?" "+esc(w.retireDate):""}</span>`:w.pending?`<span class="pill warn">退職予定${w.retireDate?" "+esc(w.retireDate):""}</span>`:`<span class="pill ok">在職中</span>`}${w.jp?`<span class="pill acc">${esc(w.jp)}</span>`:""}${applying(w)&&!w.retired?'<span class="pill acc">申請中</span>':""}${n!==null&&!w.retired?(n<0?`<span class="pill crit">在留期限切れ</span>`:n<=90?`<span class="pill warn">在留期限まで${n}日</span>`:w.expiryUpdated?`<span class="pill ok">期限更新済（こちら入力）</span>`:""):""}</div>
+      <div class="pills">${followPill(w.follow)}${entryPill(w)}${w.prevCid?`<span class="pill acc">転職（前：${esc((S.companies[w.prevCid]||{}).name||"")}）</span>`:""}${w.retired?`<span class="pill ret">退職${w.retireDate?" "+esc(w.retireDate):""}</span>`:w.pending?`<span class="pill warn">退職予定${w.retireDate?" "+esc(w.retireDate):""}</span>`:(isPre(w)?`<span class="pill pre">入国前</span>`:`<span class="pill ok">在職中</span>`)}${w.jp?`<span class="pill acc">${esc(w.jp)}</span>`:""}${applying(w)&&!w.retired?'<span class="pill acc">申請中</span>':""}${n!==null&&!w.retired?(n<0?`<span class="pill crit">在留期限切れ</span>`:n<=90?`<span class="pill warn">在留期限まで${n}日</span>`:w.expiryUpdated?`<span class="pill ok">期限更新済（こちら入力）</span>`:""):""}</div>
       <div class="btns">${telBtn(w.tel)}<button class="btn" id="editW">${w.src==="own"?"情報を編集":"補足メモ・状態"}</button><button class="btn" data-go="#/c/${encodeURIComponent(w.cid)}">企業ページへ</button></div>
     </div>
     ${(()=>{ const f=entryFollow(w); return f&&!f.done? `<div class="banner ef">🛬 入国から${f.days}日。<b>${esc(f.label)}</b>の声かけ時期です。不安や困りごとを聞いて、対応履歴を追加すると通知が消えます。</div>` : ""; })()}
