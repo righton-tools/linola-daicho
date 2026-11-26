@@ -716,7 +716,7 @@ const lsGet = k => { try{ return localStorage.getItem(k); }catch(e){ return null
 const pushBar = () => { try{ if(!staff || !pushCan() || Notification.permission!=="default" || lsGet("linola.push") || lsGet("linola.pushno")) return ""; }catch(e){ return ""; } return `<div id="pushBar" class="ttbar" style="background:#1F5FAD"><span data-pushon style="flex:1;cursor:pointer">🔔 履歴の催促を通知で受け取る<span class="go" style="margin-left:8px">タップ ›</span></span><span data-pushno style="font-weight:500;font-size:12px;opacity:.9;cursor:pointer;padding-left:10px">あとで</span></div>`; };
 document.addEventListener("click", e=>{ const t=e.target.closest && e.target; if(!t) return; if(t.closest("[data-pushon]")){ pushOn(); } else if(t.closest("[data-pushno]")){ try{ localStorage.setItem("linola.pushno","1"); }catch(x){} const pb=document.getElementById("pushBar"); if(pb) pb.remove(); } });
 window.addEventListener("hashchange", ()=>setTimeout(updateNewsBadge,0));
-const ttKeyOr = () => { const key=URL_KEY||KEY_DONE; if(!key) toast("自分用のURLから開いてください"); return key; };
+const ttKeyOr = () => { const key=URL_KEY||KEY_DONE||(staff? "name:"+staff : ""); if(!key) toast("担当者が分かりません。自分用のURLから一度開いてください"); return key; };
 async function ttCancelAsk(x, label){ const key=ttKeyOr(); if(!key) return; const reason=(prompt(`「${label}」を中止・記録不要にします。理由を入れてください（例：予定が流れた／TimeTreeの入れまちがい）`)||"").trim(); if(!reason){ toast("理由が無いので、何もしていません"); return; }
   try{ await call("ttCancel", key, {id:x.id, reason}); toast("中止・記録不要にしました"); await load(true); }catch(err){ toast("保存に失敗: "+(err.message||err)); } }
 function viewTT(){
@@ -843,13 +843,13 @@ function viewFix(){
   document.querySelectorAll("[data-ofix]").forEach(b=>b.addEventListener("click", ()=>{ const o=orph[Number(b.dataset.ofix)]; type=o.type; from={id:o.id,name:o.name}; to=null; showPick("fa",from); showPick("fb",null);
     $("#fixH").textContent=`「${o.name}」の記録の行き先を選ぶ`; $("#fal").textContent="行き先を失った名前"; $("#faq").hidden=true; $("#fbl").textContent= type==="worker" ? "今の台帳のどの人？" : "今の台帳のどの会社？"; $("#fbq").placeholder= type==="worker" ? "名前で検索" : "会社名で検索"; $("#fixReset").hidden=false; $("#fixSec").scrollIntoView({behavior:"smooth",block:"start"}); $("#fbq").focus(); }));
   $("#fixReset").addEventListener("click", render);
-  $("#af").addEventListener("submit", async e=>{ e.preventDefault(); const key=URL_KEY||KEY_DONE; if(!key){ toast("自分用のURLから開いてください"); return; }
+  $("#af").addEventListener("submit", async e=>{ e.preventDefault(); const key=ttKeyOr(); if(!key) return;
     if(!from||!to){ toast("2つとも選んでください"); return; } if(from.id===to.id){ toast("同じもの同士はまとめられません"); return; }
     if(!confirm(`「${from.name}」を「${to.name}」にまとめます。よろしいですか？\n（あとで取り消せます）`)) return;
     const btn=e.target.querySelector("button[type=submit]"); btn.disabled=true; btn.textContent="保存中…";
     try{ await call("addAlias", key, {type, from:from.id, fromName:from.name, to:to.id, toName:to.name, memo:(new FormData(e.target).get("memo")||"").trim()}); toast("まとめました"); await load(true); }
     catch(err){ toast("保存に失敗: "+(err.message||err)); btn.disabled=false; btn.textContent="まとめる"; } });
-  document.querySelectorAll("[data-adel]").forEach(b=>b.addEventListener("click", async ()=>{ const key=URL_KEY||KEY_DONE; if(!key){ toast("自分用のURLから開いてください"); return; } if(!confirm("この名寄せを取り消しますか？（まとめる前の状態に戻ります）")) return; b.disabled=true;
+  document.querySelectorAll("[data-adel]").forEach(b=>b.addEventListener("click", async ()=>{ const key=ttKeyOr(); if(!key) return; if(!confirm("この名寄せを取り消しますか？（まとめる前の状態に戻ります）")) return; b.disabled=true;
     try{ await call("deleteAlias", key, b.dataset.adel); toast("取り消しました"); await load(true); }catch(err){ toast("取消に失敗: "+(err.message||err)); b.disabled=false; } }));
 }
 
