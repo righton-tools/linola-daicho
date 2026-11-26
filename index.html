@@ -79,6 +79,18 @@ a{color:var(--accent);text-decoration:none}
 .pill.main{background:var(--surface2);color:var(--ink2)}
 .fixbar{display:flex;align-items:center;gap:8px;width:100%;border:0;border-radius:12px;padding:11px 14px;margin-bottom:10px;background:#9A6700;color:#fff;font-size:14px;font-weight:700;cursor:pointer;text-align:left;font-family:inherit}
 .fixbar .go{margin-left:auto;font-weight:500;font-size:12px;opacity:.9}
+.ttbar{display:flex;align-items:center;gap:8px;width:100%;border:0;border-radius:12px;padding:11px 14px;margin-bottom:10px;background:#B4380F;color:#fff;font-size:14px;font-weight:700;cursor:pointer;text-align:left;font-family:inherit}
+.ttbar.q{background:#9A6700}
+.ttbar .go{margin-left:auto;font-weight:500;font-size:12px;opacity:.9}
+.banner.ttstale{font-weight:700}
+.ttrow{padding:10px 0;border-bottom:1px solid var(--line)}
+.ttrow:last-child{border-bottom:0}
+.ttrow .t{font-weight:600;font-size:14.5px}
+.ttrow .d{font-size:12px;color:var(--muted);margin:2px 0 8px}
+.ttrow .btns{display:flex;flex-wrap:wrap;gap:6px}
+.ttrow .btn{padding:7px 11px;font-size:13px}
+.pill.tt{background:#fde8dc;color:#8a2c0b}
+.ttcand{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px}
 .lrow .nm.wrap{white-space:normal;overflow:visible}
 .fixpick{margin:2px 0 10px}
 .fixpick .list{margin-top:6px}
@@ -288,7 +300,7 @@ async function resolveKey(){
 function applyData(d, fromCache){
   S.companies={}; S.workers={}; S.logs={};
   d.companies.forEach(c=>S.companies[c.id]=c); d.workers.forEach(w=>S.workers[w.id]=w); d.logs.forEach(l=>S.logs[l.id]=l);
-  S.refreshedAt=d.refreshedAt; S.fromCache=!!fromCache; S.ready=true; if(!fromCache) S.lastFetch=Date.now(); S.staffList=d.staffList||[]; S.flags=d.flags||[]; S.pre={}; (d.pre||[]).forEach(p=>S.pre[p.id]=p); S.preCands=d.preCands||[]; S.preSteps=d.preSteps||S.preSteps||[]; S.news=d.news||{items:[],seen:{}}; S.links=d.links||[]; S.orphans=d.orphans||[]; S.aliases=d.aliases||[]; setTimeout(updateNewsBadge,0);
+  S.refreshedAt=d.refreshedAt; S.fromCache=!!fromCache; S.ready=true; if(!fromCache) S.lastFetch=Date.now(); S.staffList=d.staffList||[]; S.flags=d.flags||[]; S.pre={}; (d.pre||[]).forEach(p=>S.pre[p.id]=p); S.preCands=d.preCands||[]; S.preSteps=d.preSteps||S.preSteps||[]; S.news=d.news||{items:[],seen:{}}; S.links=d.links||[]; S.orphans=d.orphans||[]; S.aliases=d.aliases||[]; S.tt=d.tt||null; setTimeout(updateNewsBadge,0);
   if(!staff && !S.pickerShown){ S.pickerShown=true; setTimeout(()=>openStaff(true),0); }
 }
 async function load(silent){
@@ -402,6 +414,7 @@ function render(){
   $("#back").disabled = r.view==="home"||r.view==="pre"||r.view==="news"; syncTabs(r.view);
   if(!S.ready){ $("#main").innerHTML=`<div class="empty">読み込み中…</div>`; $("#title").innerHTML=`<span class="brand">Linola 特定技能</span>支援台帳`; return; }
   if(r.view==="fix") return viewFix();
+  if(r.view==="tt") return viewTT();
   if(r.view==="news") return viewNews();
   if(r.view==="pre"){ viewPre(); injectNewsBar(); return; }
   if(r.view==="prec") return viewPreCase(r.id);
@@ -425,7 +438,7 @@ function viewHome(){
   const soon = warn.filter(w=>exDays(w)<=30), warn90 = warn.filter(w=>exDays(w)>30), applyN = active.filter(applying);
   const fAll=all.map(followOf).filter(Boolean); const nFollow=fAll.length, nDue=fAll.filter(f=>f.days!==null&&f.days<=7).length;
   $("#main").innerHTML = `
-    ${fixBar()}${entryBar()}
+    ${ttStale()}${ttBar()}${fixBar()}${entryBar()}
     <div class="summary s3">
       <div class="tile"><b>${all.filter(c=>cWork.has(c.id)).length}</b><span>受入企業数</span></div>
       <div class="tile"><b>${entered.length}</b><span>在職者</span></div>
@@ -665,7 +678,7 @@ const unreadNews = () => { const n=S.news||{items:[],seen:{}}; const seen=(n.see
 function updateNewsBadge(){
   const u=S.ready?unreadNews().length:0; const b=$("#newsBdg");
   if(b){ b.textContent=u>99?"99+":String(u); b.hidden=!u; }
-  const t=u+entryList().length;
+  const t=u+entryList().length+ttDue().length;
   document.title=(t?`(${t}) `:"")+"Linola 支援台帳";
   try{ if(navigator.setAppBadge){ if(t) navigator.setAppBadge(t); else navigator.clearAppBadge(); } }catch(e){}
   return u;
@@ -688,6 +701,112 @@ function viewNews(){
 // ---------- 名寄せ・ズレ確認（行き先のない記録を戻す／同じ会社の別名をまとめる。記録そのものは書き換えない） ----------
 const fixBar = () => (S.orphans||[]).length ? `<button type="button" class="fixbar">⚠ 行き先のない記録 ${S.orphans.length}件<span class="go">タップして直す ›</span></button>` : "";
 document.addEventListener("click", e=>{ if(e.target.closest && e.target.closest(".fixbar")) go("#/fix"); });
+// ---------- TimeTreeの予定 → 履歴の入れ忘れの催促（予定はサーバーが持つ。ここは出すだけ。人の名前は帯・一覧に出さない） ----------
+const TT_RULE = { "企面":["c",["面談","訪問"]], "外面":["w",["面談","訪問"]], "支援":["",["生活支援","訪問","面談"]], "入国":["",["入管","生活支援","訪問"]], "対応":["",null] };
+const ttYmd = s => { const d=parseDate(s); return d? `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,"0")}/${String(d.getDate()).padStart(2,"0")}` : ""; };
+const ttDay = s => { const d=parseDate(s); return d? `${d.getMonth()+1}月${d.getDate()}日(${"日月火水木金土"[d.getDay()]})` : String(s||""); };
+// サーバーが「まだ」と言った予定でも、この端末で履歴を入れた直後ならすぐ消す（決まりはサーバーと同じ）
+const ttDoneLocal = x => { const r=TT_RULE[x.mark]; if(!r) return false; return Object.values(S.logs).some(l=>{ const isW=l.type==="worker"; const w=isW?S.workers[l.wid]:null; if(!(l.cid===x.cid || (w && !w.moved && w.cid===x.cid))) return false; if(r[0] && (r[0]==="w")!==isW) return false; if(r[1] && !r[1].includes(l.kind)) return false; return ttYmd(l.date)>=x.date; }); };
+const ttDue = () => { const t=S.tt; if(!S.ready||!t) return []; const now=Date.now(); return (t.items||[]).filter(x=>x.since<=now && !ttDoneLocal(x)).concat((t.unknown||[]).filter(x=>x.since<=now).map(x=>Object.assign({unk:true}, x))); };
+const ttStale = () => { const t=S.tt; if(!t) return ""; if(t.last && Date.now()-t.last<=13*3600000) return ""; const d=new Date((t.last||0)+9*3600000); return `<div class="banner ttstale">⚠ TimeTreeの読み込みが止まっています（${t.last?`最後：${d.getUTCMonth()+1}月${d.getUTCDate()}日 ${d.getUTCHours()}時`:"まだ一度も読み込んでいません"}）</div>`; };
+const ttBar = () => { const n=ttDue().length, q=((S.tt||{}).unknown||[]).length; return (n?`<button type="button" class="ttbar" data-ttgo="#/tt">📝 履歴がまだの予定 ${n}件<span class="go">タップして確認 ›</span></button>`:"")+(q?`<button type="button" class="ttbar q" data-ttgo="#/fix">📅 この予定はどの会社？ ${q}件<span class="go">タップして選ぶ ›</span></button>`:""); };
+document.addEventListener("click", e=>{ const b=e.target.closest && e.target.closest("[data-ttgo]"); if(b) go(b.dataset.ttgo); });
+window.addEventListener("hashchange", ()=>setTimeout(updateNewsBadge,0));
+const ttKeyOr = () => { const key=URL_KEY||KEY_DONE; if(!key) toast("自分用のURLから開いてください"); return key; };
+async function ttCancelAsk(x, label){ const key=ttKeyOr(); if(!key) return; const reason=(prompt(`「${label}」を中止・記録不要にします。理由を入れてください（例：予定が流れた／TimeTreeの入れまちがい）`)||"").trim(); if(!reason){ toast("理由が無いので、何もしていません"); return; }
+  try{ await call("ttCancel", key, {id:x.id, reason}); toast("中止・記録不要にしました"); await load(true); }catch(err){ toast("保存に失敗: "+(err.message||err)); } }
+function viewTT(){
+  $("#title").innerHTML=`<span class="brand">TimeTreeの予定</span>履歴がまだの予定`;
+  const due=ttDue();
+  $("#main").innerHTML=`${ttStale()}
+    <div class="banner info">TimeTreeの予定（【支援】【対応】【入国】【企面】【外面】）のうち、終わったのに対応履歴がまだのものです。会社を開いて履歴を入れると消えます。</div>
+    <div class="card">${due.map((x,i)=>`<div class="ttrow"><div class="t"><span class="pill tt">${esc(x.mark)}</span> ${x.unk?"（会社を選んでください）":esc(x.cname)}</div><div class="d">予定の日：${esc(ttDay(x.date))}</div>
+      <div class="btns">${x.unk?`<button class="btn primary" type="button" data-ttgo="#/fix/${encodeURIComponent(x.id)}">会社を選ぶ</button>`:`<button class="btn primary" type="button" data-ttgo="#/c/${encodeURIComponent(x.cid)}">履歴を入れる ›</button><button class="btn" type="button" data-ttgo="#/fix/${encodeURIComponent(x.id)}">会社がちがう</button>`}<button class="btn" type="button" data-ttx="${i}">中止・記録不要</button></div></div>`).join("") || `<div class="empty">履歴がまだの予定はありません</div>`}</div>
+    <div class="empty" style="font-size:12px"><a href="#/fix">呼び名・中止した予定・通知の設定</a></div>`;
+  document.querySelectorAll("[data-ttx]").forEach(b=>b.addEventListener("click", ()=>{ const x=due[Number(b.dataset.ttx)]; ttCancelAsk(x, `【${x.mark}】${x.unk?"会社未設定":x.cname} ${ttDay(x.date)}`); }));
+}
+// 「名寄せ・ズレ確認」の画面に足す分：この予定はどの会社？／覚えた呼び名／中止した予定／プッシュ通知
+function ttFixWire(){
+  const t=S.tt; if(!t) return; const unk=t.unknown||[]; const want=route().id; const fixIt=want? (t.items||[]).concat(unk).find(x=>x.id===want) : null;
+  const cName=id=>String((S.companies[id]||{}).name||"").replace(/ +/g," ");
+  const top=(unk.length||fixIt)?`<section class="sec" id="ttSec" style="margin-top:0"><div class="sec-h"><h2>この予定はどの会社？${unk.length?` (${unk.length})`:""}</h2></div><div class="card">
+      ${unk.map((x,i)=>`<div class="lrow"><span class="nm wrap">📅 【${esc(x.mark)}】${esc(x.title||"（呼び名なし）")}<br><span class="lk">予定の日 ${esc(ttDay(x.date))}</span></span><button class="btn" type="button" data-ttq="${i}">会社を選ぶ</button><button class="del" type="button" data-ttqx="${i}">中止</button></div>`).join("") || `<div class="empty" style="padding:6px 0">会社が分からない予定はありません</div>`}
+      <form class="f" id="tf" hidden><div class="banner info" id="tfh" style="margin:10px 0 8px"></div><div class="ttcand" id="tfc"></div>
+        <div class="fixpick"><label><span>会社を探す</span><input id="tfq" placeholder="会社名で検索" autocomplete="off"></label><div class="list" id="tfr"></div><div class="picked" id="tfp">未選択</div></div>
+        <label>次から自動で当てる呼び名（空でもOK）<input name="alias" id="tfa" placeholder="例：カト健"></label>
+        <div class="empty" style="font-size:11.5px;padding:0 0 8px;text-align:left">タイトルそのままは自動で覚えます。人の名前などが付いている時は、会社を表す部分だけをここに入れると、次から自動で当たります。</div>
+        <div class="btns"><button class="btn primary" type="submit">この会社にする</button><button class="btn ghost" type="button" id="tfx">やめる</button></div></form>
+    </div></section>`:"";
+  const names=t.names||[], off=t.off||[], P=t.push||{to:[],on:[]};
+  const bottom=`<section class="sec"><div class="sec-h"><h2>予定の呼び名${names.length?` (${names.length})`:""}</h2></div><div class="card">
+      ${names.map(a=>`<div class="lrow"><span class="nm wrap">📅 ${esc(a.name)} → ${esc(cName(a.cid)||a.cname)}<br><span class="lk">${esc(a.staff||"")} ${esc(String(a.at||"").slice(0,10))}</span></span><button class="del" type="button" data-ttnd="${esc(a.id)}">取消</button></div>`).join("") || `<div class="empty" style="padding:6px 0">まだありません（TimeTreeの予定の呼び名と会社の組み合わせを、ここに覚えます）</div>`}
+    </div></section>
+    ${off.length?`<section class="sec"><div class="sec-h"><h2>中止・記録不要にした予定 (${off.length})</h2></div><div class="card">${off.map(o=>`<div class="lrow"><span class="nm wrap">【${esc(o.mark)}】${esc(o.name)} ${esc(ttDay(o.date))}<br><span class="lk">${esc(o.reason||"")} · ${esc(o.staff||"")}</span></span><button class="del" type="button" data-ttun="${esc(o.id)}">元に戻す</button></div>`).join("")}</div></section>`:""}
+    <section class="sec" id="pushSec"><div class="sec-h"><h2>プッシュ通知（履歴がまだの予定のお知らせ）</h2></div><div class="card">
+      <div class="empty" style="font-size:12.5px;padding:0 0 8px;text-align:left">文面はいつも「履歴がまだの予定があります」だけです（会社名や人の名前は通知に出ません）。iPhoneは、台帳をホーム画面に追加して、そのアイコンから開いた時だけ使えます。</div>
+      <div class="kv"><div class="k">この端末</div><div class="v" id="pushSt">確認中…</div></div>
+      <div class="kv"><div class="k">いま送る相手</div><div class="v" id="pushTo">${esc((P.to||[]).join("、")||"なし")}</div></div>
+      <div class="kv"><div class="k">登録ずみの人</div><div class="v">${esc((P.on||[]).join("、")||"まだいません")}</div></div>
+      <div class="btns"><button class="btn primary" type="button" id="pushOn">この端末で通知を受け取る</button><button class="btn" type="button" id="pushTry">試しに送る</button><button class="btn ghost" type="button" id="pushOff">やめる</button></div>
+      <details style="margin-top:10px"><summary style="font-size:13px;cursor:pointer">送る相手を変える（パスコードが必要）</summary><form class="f" id="pf" style="margin-top:8px">
+        ${["全員"].concat(S.staffList||[]).map(n=>`<label class="chk"><input type="checkbox" name="to" value="${esc(n)}" ${(P.to||[]).includes(n)?"checked":""}> ${esc(n)}</label>`).join("")}
+        <label>変更用パスコード<input name="pin" type="password" inputmode="numeric" autocomplete="off"></label>
+        <div class="btns"><button class="btn primary" type="submit">送る相手を保存</button></div></form></details>
+    </div></section>`;
+  const ban=$("#main .banner"); if(top && ban) ban.insertAdjacentHTML("afterend", top); $("#main").insertAdjacentHTML("beforeend", bottom);
+  // --- どの会社？ ---
+  let cur=null, pick=null; const nk=s=>String(s||"").toLowerCase().split(" ").join("").split("　").join("");
+  const cands=()=>Object.values(S.companies).map(c=>({id:c.id, name:String(c.name).replace(/ +/g," "), sub:[c.pref,c.city].filter(Boolean).join(" ")+" · 在職"+workersOf(c.id).filter(w=>!w.retired).length+"名"}));
+  const setPick=x=>{ pick=x; $("#tfp").innerHTML = x ? `選択中：<b>${esc(x.name)}</b>` : "未選択"; };
+  const openForm=x=>{ cur=x; setPick(null); const f=$("#tf"); f.hidden=false; $("#tfh").textContent=`【${x.mark}】${x.title||""}（${ttDay(x.date)}）は、どの会社の予定ですか？${x.cname?` いまは「${x.cname}」になっています。`:""}`;
+    const w=String(x.title||"").split(" "); $("#tfa").value = w.length>1 ? w[0] : "";
+    const cs=(x.cand||[]); $("#tfc").innerHTML=cs.map((c,i)=>`<button class="btn" type="button" data-ttc="${i}">${esc(String(c.name).replace(/ +/g," "))}</button>`).join("");
+    $("#tfc").querySelectorAll("[data-ttc]").forEach(b=>b.addEventListener("click", ()=>setPick(cs[Number(b.dataset.ttc)])));
+    f.scrollIntoView({behavior:"smooth",block:"center"}); };
+  if(top){
+    $("#tfq").addEventListener("input", e=>{ const k=nk(e.target.value); const r=k? cands().filter(x=>nk(x.name).includes(k)).slice(0,8) : []; const box=$("#tfr");
+      box.innerHTML=r.map((x,i)=>`<button type="button" class="row" data-tpk="${i}"><div class="body"><div class="t"><span class="nm">${esc(x.name)}</span></div><div class="s">${esc(x.sub)}</div></div></button>`).join("");
+      box.querySelectorAll("[data-tpk]").forEach(b=>b.addEventListener("click", ()=>{ setPick(r[Number(b.dataset.tpk)]); box.innerHTML=""; $("#tfq").value=""; })); });
+    document.querySelectorAll("[data-ttq]").forEach(b=>b.addEventListener("click", ()=>openForm(unk[Number(b.dataset.ttq)])));
+    document.querySelectorAll("[data-ttqx]").forEach(b=>b.addEventListener("click", ()=>{ const x=unk[Number(b.dataset.ttqx)]; ttCancelAsk(x, `【${x.mark}】${x.title||""} ${ttDay(x.date)}`); }));
+    $("#tfx").addEventListener("click", ()=>{ $("#tf").hidden=true; cur=null; if(want) go("#/fix"); });
+    $("#tf").addEventListener("submit", async e=>{ e.preventDefault(); const key=ttKeyOr(); if(!key) return; if(!cur||!pick){ toast("会社を選んでください"); return; }
+      const btn=e.target.querySelector("button[type=submit]"); btn.disabled=true; btn.textContent="保存中…";
+      try{ await call("ttAssign", key, {id:cur.id, cid:pick.id, alias:($("#tfa").value||"").trim()}); toast("覚えました"); if(want) location.hash="#/fix"; await load(true); }
+      catch(err){ toast("保存に失敗: "+(err.message||err)); btn.disabled=false; btn.textContent="この会社にする"; } });
+    if(fixIt) openForm(fixIt);
+  }
+  document.querySelectorAll("[data-ttnd]").forEach(b=>b.addEventListener("click", async ()=>{ const key=ttKeyOr(); if(!key) return; if(!confirm("この呼び名を取り消しますか？（次から自動では当たらなくなります）")) return; b.disabled=true; try{ await call("ttNameDelete", key, b.dataset.ttnd); toast("取り消しました"); await load(true); }catch(err){ toast("取消に失敗: "+(err.message||err)); b.disabled=false; } }));
+  document.querySelectorAll("[data-ttun]").forEach(b=>b.addEventListener("click", async ()=>{ const key=ttKeyOr(); if(!key) return; b.disabled=true; try{ await call("ttCancel", key, {id:b.dataset.ttun, undo:true}); toast("元に戻しました"); await load(true); }catch(err){ toast("失敗: "+(err.message||err)); b.disabled=false; } }));
+  // --- プッシュ通知 ---
+  pushState().then(s=>{ const el=$("#pushSt"); if(el) el.textContent=s; });
+  $("#pushOn").addEventListener("click", async e=>{ e.target.disabled=true; try{ await pushOn(); }catch(err){ toast("通知の登録に失敗: "+(err.message||err)); } e.target.disabled=false; const el=$("#pushSt"); if(el) el.textContent=await pushState(); });
+  $("#pushOff").addEventListener("click", async ()=>{ try{ await pushOff(); toast("この端末の通知をやめました"); }catch(err){ toast("失敗: "+(err.message||err)); } const el=$("#pushSt"); if(el) el.textContent=await pushState(); });
+  $("#pushTry").addEventListener("click", async e=>{ const key=ttKeyOr(); if(!key) return; e.target.disabled=true; try{ const r=await call("pushTest", key); toast(r.devices? `自分の端末 ${r.devices}台に送りました（成功 ${r.ok}台）` : "自分の端末がまだ登録されていません"); }catch(err){ toast("送れませんでした: "+(err.message||err)); } e.target.disabled=false; });
+  $("#pf").addEventListener("submit", async e=>{ e.preventDefault(); const key=ttKeyOr(); if(!key) return; const f=new FormData(e.target); const names=f.getAll("to");
+    try{ const to=await call("pushTargets", key, {pin:(f.get("pin")||"").trim(), names}); toast("送る相手を保存しました"); if(S.tt&&S.tt.push) S.tt.push.to=to; $("#pushTo").textContent=to.join("、"); e.target.reset(); (to||[]).forEach(n=>{ const c=[...e.target.querySelectorAll("[name=to]")].find(x=>x.value===n); if(c) c.checked=true; }); }
+    catch(err){ toast("保存に失敗: "+(err.message||err)); } });
+}
+const pushCan = () => !!navigator.serviceWorker && "PushManager" in window && "Notification" in window;
+const b64uBytes = s => { const t=String(s).split("-").join("+").split("_").join("/"); const raw=atob(t+"=".repeat((4-t.length%4)%4)); return Uint8Array.from(raw, ch=>ch.charCodeAt(0)); };
+const pushSub = async () => { const reg=await navigator.serviceWorker.getRegistration(); return reg ? await reg.pushManager.getSubscription() : null; };
+async function pushState(){ if(!pushCan()) return "この端末・ブラウザでは使えません（iPhoneはホーム画面に追加してから）"; if(Notification.permission==="denied") return "通知が「許可しない」になっています（端末の設定で直せます）"; try{ const sub=await pushSub(); return sub ? "受け取る設定になっています" : "まだ登録していません"; }catch(e){ return "まだ登録していません"; } }
+async function pushOn(){ const key=ttKeyOr(); if(!key) return; if(!pushCan()){ toast("この端末・ブラウザでは使えません（iPhoneはホーム画面に追加してから）"); return; }
+  const perm=await Notification.requestPermission(); if(perm!=="granted"){ toast("通知が許可されませんでした"); return; }   // 許可の画面は、ボタンを押した直後に出す（iPhoneの決まり）
+  const pk=(S.tt&&S.tt.push&&S.tt.push.key)||await call("pushKey"); if(!pk){ toast("通知の準備がまだ終わっていません"); return; }
+  const reg=await navigator.serviceWorker.ready; let sub=await reg.pushManager.getSubscription(); let old=""; try{ old=localStorage.getItem("linola.pushkey")||""; }catch(e){}
+  if(sub && old!==pk){ try{ await sub.unsubscribe(); }catch(e){} sub=null; }
+  if(!sub) sub=await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:b64uBytes(pk)});
+  await call("pushSubscribe", key, {endpoint:sub.endpoint}); try{ localStorage.setItem("linola.push", sub.endpoint); localStorage.setItem("linola.pushkey", pk); }catch(e){}
+  toast("この端末で通知を受け取ります"); }
+async function pushOff(){ const key=ttKeyOr(); if(!key) return; const sub=pushCan()? await pushSub() : null; if(sub){ await call("pushUnsubscribe", key, {endpoint:sub.endpoint}); await sub.unsubscribe(); } try{ localStorage.removeItem("linola.push"); }catch(e){} }
+// 開くたび：通知の受け口（sw.js）を登録。通知の宛先が変わっていたら、サーバーに伝え直す
+if(navigator.serviceWorker){
+  navigator.serviceWorker.register("sw.js").then(async ()=>{ try{ if(!pushCan() || Notification.permission!=="granted") return; const key=URL_KEY||KEY_DONE; const sub=await pushSub(); if(!key||!sub) return; if(localStorage.getItem("linola.push")===sub.endpoint) return; await call("pushSubscribe", key, {endpoint:sub.endpoint}); localStorage.setItem("linola.push", sub.endpoint); }catch(e){} }).catch(()=>{});
+  navigator.serviceWorker.addEventListener("message", e=>{ if(e.data && e.data.go) go(e.data.go); });
+}
+// 予定を読む役（Claude）が、台帳のタブから予定を送る入口。担当者のキーはこの端末の中だけで使い、戻り値には入れない
+window.linolaTT = async o => { const key=URL_KEY||KEY_DONE; if(!key) return {err:"NOKEY"}; try{ return await call("ttImport", key, o); }catch(e){ return {err:String((e&&e.message)||e)}; } };
 function viewFix(){
   $("#title").innerHTML=`<span class="brand">台帳の手入れ</span>名寄せ・ズレ確認`;
   const orph=S.orphans||[], al=S.aliases||[]; const cName=id=>String((S.companies[id]||{}).name||"").replace(/\s+/g," ");
@@ -708,6 +827,7 @@ function viewFix(){
     <section class="sec"><div class="sec-h"><h2>今の名寄せ${al.length?` (${al.length})`:""}</h2></div><div class="card">
       ${al.map(a=>`<div class="lrow"><span class="nm wrap">${a.type==="worker"?"👤":"🏢"} ${esc(a.fromName||a.from)} → ${esc(a.toName||a.to)}<br><span class="lk">${esc(a.staff||"")} ${esc(String(a.at||"").slice(0,10))}${a.memo?" · "+esc(a.memo):""}</span></span><button class="del" type="button" data-adel="${esc(a.id)}">取消</button></div>`).join("") || `<div class="empty" style="padding:6px 0">まだありません</div>`}
     </div></section>`;
+  ttFixWire();
   let type="company", from=null, to=null; const nk=s=>String(s||"").toLowerCase().replace(/\s/g,"");
   const cands=()=> type==="worker" ? Object.values(S.workers).filter(w=>!w.moved).map(w=>({id:w.id,name:w.name,sub:[cName(w.cid),w.birth,w.retired?"退職":""].filter(Boolean).join(" · ")})) : Object.values(S.companies).map(c=>({id:c.id,name:String(c.name).replace(/\s+/g," "),sub:[c.pref,c.city].filter(Boolean).join(" ")+" · 在職"+workersOf(c.id).filter(w=>!w.retired).length+"名"}));
   const showPick=(id,x)=>{ $("#"+id+"p").innerHTML = x ? `選択中：<b>${esc(x.name)}</b>` : "未選択"; };
