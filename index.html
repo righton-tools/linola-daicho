@@ -303,14 +303,14 @@ function applyData(d, fromCache){
   S.refreshedAt=d.refreshedAt; S.fromCache=!!fromCache; S.ready=true; if(!fromCache) S.lastFetch=Date.now(); S.staffList=d.staffList||[]; S.flags=d.flags||[]; S.pre={}; (d.pre||[]).forEach(p=>S.pre[p.id]=p); S.preCands=d.preCands||[]; S.preSteps=d.preSteps||S.preSteps||[]; S.news=d.news||{items:[],seen:{}}; S.links=d.links||[]; S.orphans=d.orphans||[]; S.aliases=d.aliases||[]; S.tt=d.tt||null; setTimeout(updateNewsBadge,0);
   if(!staff && !S.pickerShown){ S.pickerShown=true; setTimeout(()=>openStaff(true),0); }
 }
-async function load(silent){
+async function load(silent, fresh){
   if(!silent && !S.ready){
     try{ const c=JSON.parse(localStorage.getItem("linola.cache")||"null"); if(c && c.companies){ applyData(c, true); } }catch(e){}
     render();
   }
   setDot("sync");
   try{
-    const [d] = await Promise.all([call("getAll"), resolveKey()]);
+    const [d] = await Promise.all([fresh? call("getAll", {fresh:1}) : call("getAll"), resolveKey()]);
     applyData(d, false);
     try{ localStorage.setItem("linola.cache", JSON.stringify(d)); }catch(e){}
     setDot("on"); render();
@@ -377,10 +377,10 @@ $("#back").addEventListener("click", ()=>{ const r=route(); if(r.view==="w"){ co
 $("#staffBtn").addEventListener("click", ()=>openStaff(false));
 // ---------- 更新（手動ボタン・引っぱって更新・復帰時/定期の自動更新） ----------
 const busyInput=()=>{ const a=document.activeElement; return !!(a && (a.tagName==="INPUT"||a.tagName==="TEXTAREA"||a.tagName==="SELECT")); };
-async function refresh(manual){ if(S.loading) return; if(!manual && busyInput()) return; S.loading=true; const b=$("#refreshBtn"); b.classList.add("spin"); try{ await load(true); if(manual) toast("最新に更新しました"); } finally { S.loading=false; b.classList.remove("spin"); } }
+async function refresh(manual){ if(S.loading) return; if(!manual && busyInput()) return; S.loading=true; const b=$("#refreshBtn"); b.classList.add("spin"); try{ await load(true, manual); if(manual) toast("最新に更新しました"); } finally { S.loading=false; b.classList.remove("spin"); } }
 $("#refreshBtn").addEventListener("click", ()=>refresh(true));
 document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible" && Date.now()-(S.lastFetch||0)>60000) refresh(false); });
-setInterval(()=>{ if(document.visibilityState==="visible" && Date.now()-(S.lastFetch||0)>180000) refresh(false); }, 30000);
+setInterval(()=>{ if(document.visibilityState==="visible" && Date.now()-(S.lastFetch||0)>60000) refresh(false); }, 20000);
 let ptrY=null; const ptr=document.createElement("div"); ptr.className="ptr"; ptr.textContent="↓ 引っぱって更新"; document.body.appendChild(ptr);
 document.addEventListener("touchstart", e=>{ ptrY = (window.scrollY<=0 && !busyInput()) ? e.touches[0].clientY : null; ptr.dataset.go=""; }, {passive:true});
 document.addEventListener("touchmove", e=>{ if(ptrY===null) return; const d=e.touches[0].clientY-ptrY; if(d>20){ ptr.style.opacity=String(Math.min(1,(d-20)/60)); const go=d>90; ptr.textContent = go ? "↑ 離して更新" : "↓ 引っぱって更新"; ptr.dataset.go = go ? "1" : ""; } }, {passive:true});
