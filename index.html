@@ -438,7 +438,7 @@ function viewHome(){
   const soon = warn.filter(w=>exDays(w)<=30), warn90 = warn.filter(w=>exDays(w)>30), applyN = active.filter(applying);
   const fAll=all.map(followOf).filter(Boolean); const nFollow=fAll.length, nDue=fAll.filter(f=>f.days!==null&&f.days<=7).length;
   $("#main").innerHTML = `
-    ${ttStale()}${ttBar()}${fixBar()}${entryBar()}
+    ${ttStale()}${ttBar()}${pushBar()}${fixBar()}${entryBar()}
     <div class="summary s3">
       <div class="tile"><b>${all.filter(c=>cWork.has(c.id)).length}</b><span>受入企業数</span></div>
       <div class="tile"><b>${entered.length}</b><span>在職者</span></div>
@@ -711,6 +711,10 @@ const ttDue = () => { const t=S.tt; if(!S.ready||!t) return []; const now=Date.n
 const ttStale = () => { const t=S.tt; if(!t) return ""; if(t.last && Date.now()-t.last<=13*3600000) return ""; const d=new Date((t.last||0)+9*3600000); return `<div class="banner ttstale">⚠ TimeTreeの読み込みが止まっています（${t.last?`最後：${d.getUTCMonth()+1}月${d.getUTCDate()}日 ${d.getUTCHours()}時`:"まだ一度も読み込んでいません"}）</div>`; };
 const ttBar = () => { const n=ttDue().length, q=((S.tt||{}).unknown||[]).length; return (n?`<button type="button" class="ttbar" data-ttgo="#/tt">📝 履歴がまだの予定 ${n}件<span class="go">タップして確認 ›</span></button>`:"")+(q?`<button type="button" class="ttbar q" data-ttgo="#/fix">📅 この予定はどの会社？ ${q}件<span class="go">タップして選ぶ ›</span></button>`:""); };
 document.addEventListener("click", e=>{ const b=e.target.closest && e.target.closest("[data-ttgo]"); if(b) go(b.dataset.ttgo); });
+// ホームの「通知を受け取る」の帯：通知が使える端末で、まだ許可も登録もしていない時だけ出す。押すと許可の画面が出る。「あとで」で消せる
+const lsGet = k => { try{ return localStorage.getItem(k); }catch(e){ return null; } };
+const pushBar = () => { try{ if(!staff || !pushCan() || Notification.permission!=="default" || lsGet("linola.push") || lsGet("linola.pushno")) return ""; }catch(e){ return ""; } return `<div id="pushBar" class="ttbar" style="background:#1F5FAD"><span data-pushon style="flex:1;cursor:pointer">🔔 履歴の催促を通知で受け取る<span class="go" style="margin-left:8px">タップ ›</span></span><span data-pushno style="font-weight:500;font-size:12px;opacity:.9;cursor:pointer;padding-left:10px">あとで</span></div>`; };
+document.addEventListener("click", e=>{ const t=e.target.closest && e.target; if(!t) return; if(t.closest("[data-pushon]")){ pushOn(); } else if(t.closest("[data-pushno]")){ try{ localStorage.setItem("linola.pushno","1"); }catch(x){} const pb=document.getElementById("pushBar"); if(pb) pb.remove(); } });
 window.addEventListener("hashchange", ()=>setTimeout(updateNewsBadge,0));
 const ttKeyOr = () => { const key=URL_KEY||KEY_DONE; if(!key) toast("自分用のURLから開いてください"); return key; };
 async function ttCancelAsk(x, label){ const key=ttKeyOr(); if(!key) return; const reason=(prompt(`「${label}」を中止・記録不要にします。理由を入れてください（例：予定が流れた／TimeTreeの入れまちがい）`)||"").trim(); if(!reason){ toast("理由が無いので、何もしていません"); return; }
@@ -782,27 +786,28 @@ function ttFixWire(){
   pushState().then(s=>{ const el=$("#pushSt"); if(el) el.textContent=s; });
   $("#pushOn").addEventListener("click", async e=>{ e.target.disabled=true; try{ await pushOn(); }catch(err){ toast("通知の登録に失敗: "+(err.message||err)); } e.target.disabled=false; const el=$("#pushSt"); if(el) el.textContent=await pushState(); });
   $("#pushOff").addEventListener("click", async ()=>{ try{ await pushOff(); toast("この端末の通知をやめました"); }catch(err){ toast("失敗: "+(err.message||err)); } const el=$("#pushSt"); if(el) el.textContent=await pushState(); });
-  $("#pushTry").addEventListener("click", async e=>{ const key=ttKeyOr(); if(!key) return; e.target.disabled=true; try{ const r=await call("pushTest", key); toast(r.devices? `自分の端末 ${r.devices}台に送りました（成功 ${r.ok}台）` : "自分の端末がまだ登録されていません"); }catch(err){ toast("送れませんでした: "+(err.message||err)); } e.target.disabled=false; });
+  $("#pushTry").addEventListener("click", async e=>{ const w=pushWho(); if(!w.ok) return; e.target.disabled=true; try{ const r=await call("pushTest", w.key, {name:staff}); toast(r.devices? `自分の端末 ${r.devices}台に送りました（成功 ${r.ok}台）` : "自分の端末がまだ登録されていません"); }catch(err){ toast("送れませんでした: "+(err.message||err)); } e.target.disabled=false; });
   $("#pf").addEventListener("submit", async e=>{ e.preventDefault(); const key=ttKeyOr(); if(!key) return; const f=new FormData(e.target); const names=f.getAll("to");
     try{ const to=await call("pushTargets", key, {pin:(f.get("pin")||"").trim(), names}); toast("送る相手を保存しました"); if(S.tt&&S.tt.push) S.tt.push.to=to; $("#pushTo").textContent=to.join("、"); e.target.reset(); (to||[]).forEach(n=>{ const c=[...e.target.querySelectorAll("[name=to]")].find(x=>x.value===n); if(c) c.checked=true; }); }
     catch(err){ toast("保存に失敗: "+(err.message||err)); } });
 }
+const pushWho = () => { const key=URL_KEY||KEY_DONE; if(!key && !staff) toast("担当者が分かりません。自分用のURLから一度開いてください"); return { key: key||"", ok: !!(key||staff) }; };
 const pushCan = () => !!navigator.serviceWorker && "PushManager" in window && "Notification" in window;
 const b64uBytes = s => { const t=String(s).split("-").join("+").split("_").join("/"); const raw=atob(t+"=".repeat((4-t.length%4)%4)); return Uint8Array.from(raw, ch=>ch.charCodeAt(0)); };
 const pushSub = async () => { const reg=await navigator.serviceWorker.getRegistration(); return reg ? await reg.pushManager.getSubscription() : null; };
 async function pushState(){ if(!pushCan()) return "この端末・ブラウザでは使えません（iPhoneはホーム画面に追加してから）"; if(Notification.permission==="denied") return "通知が「許可しない」になっています（端末の設定で直せます）"; try{ const sub=await pushSub(); return sub ? "受け取る設定になっています" : "まだ登録していません"; }catch(e){ return "まだ登録していません"; } }
-async function pushOn(){ const key=ttKeyOr(); if(!key) return; if(!pushCan()){ toast("この端末・ブラウザでは使えません（iPhoneはホーム画面に追加してから）"); return; }
+async function pushOn(){ const w=pushWho(); if(!w.ok) return; const key=w.key; if(!pushCan()){ toast("この端末・ブラウザでは使えません（iPhoneはホーム画面に追加してから）"); return; }
   const perm=await Notification.requestPermission(); if(perm!=="granted"){ toast("通知が許可されませんでした"); return; }   // 許可の画面は、ボタンを押した直後に出す（iPhoneの決まり）
   const pk=(S.tt&&S.tt.push&&S.tt.push.key)||await call("pushKey"); if(!pk){ toast("通知の準備がまだ終わっていません"); return; }
   const reg=await navigator.serviceWorker.ready; let sub=await reg.pushManager.getSubscription(); let old=""; try{ old=localStorage.getItem("linola.pushkey")||""; }catch(e){}
   if(sub && old!==pk){ try{ await sub.unsubscribe(); }catch(e){} sub=null; }
   if(!sub) sub=await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:b64uBytes(pk)});
-  await call("pushSubscribe", key, {endpoint:sub.endpoint}); try{ localStorage.setItem("linola.push", sub.endpoint); localStorage.setItem("linola.pushkey", pk); }catch(e){}
+  await call("pushSubscribe", key, {endpoint:sub.endpoint, name:staff}); const pb=document.getElementById("pushBar"); if(pb) pb.remove(); try{ localStorage.setItem("linola.push", sub.endpoint); localStorage.setItem("linola.pushkey", pk); }catch(e){}
   toast("この端末で通知を受け取ります"); }
-async function pushOff(){ const key=ttKeyOr(); if(!key) return; const sub=pushCan()? await pushSub() : null; if(sub){ await call("pushUnsubscribe", key, {endpoint:sub.endpoint}); await sub.unsubscribe(); } try{ localStorage.removeItem("linola.push"); }catch(e){} }
+async function pushOff(){ const w=pushWho(); if(!w.ok) return; const sub=pushCan()? await pushSub() : null; if(sub){ await call("pushUnsubscribe", w.key, {endpoint:sub.endpoint, name:staff}); await sub.unsubscribe(); } try{ localStorage.removeItem("linola.push"); }catch(e){} }
 // 開くたび：通知の受け口（sw.js）を登録。通知の宛先が変わっていたら、サーバーに伝え直す
 if(navigator.serviceWorker){
-  navigator.serviceWorker.register("sw.js").then(async ()=>{ try{ if(!pushCan() || Notification.permission!=="granted") return; const key=URL_KEY||KEY_DONE; const sub=await pushSub(); if(!key||!sub) return; if(localStorage.getItem("linola.push")===sub.endpoint) return; await call("pushSubscribe", key, {endpoint:sub.endpoint}); localStorage.setItem("linola.push", sub.endpoint); }catch(e){} }).catch(()=>{});
+  navigator.serviceWorker.register("sw.js").then(async ()=>{ try{ if(!pushCan() || Notification.permission!=="granted") return; const key=URL_KEY||KEY_DONE; const sub=await pushSub(); if((!key&&!staff)||!sub) return; if(localStorage.getItem("linola.push")===sub.endpoint) return; await call("pushSubscribe", key||"", {endpoint:sub.endpoint, name:staff}); localStorage.setItem("linola.push", sub.endpoint); }catch(e){} }).catch(()=>{});
   navigator.serviceWorker.addEventListener("message", e=>{ if(e.data && e.data.go) go(e.data.go); });
 }
 // 予定を読む役（Claude）が、台帳のタブから予定を送る入口。担当者のキーはこの端末の中だけで使い、戻り値には入れない
