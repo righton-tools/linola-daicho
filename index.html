@@ -124,6 +124,8 @@ a{color:var(--accent);text-decoration:none}
 .chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:8px;-webkit-overflow-scrolling:touch}
 .chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 12px;font-size:12.5px;white-space:nowrap;cursor:pointer;color:var(--ink2)}
 .chip.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.mkchip{touch-action:manipulation;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 12px;font-size:12.5px;white-space:nowrap;cursor:pointer;color:var(--ink2);font-family:inherit}
+.mkchip.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 .summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px}
 .summary.s3{grid-template-columns:repeat(3,1fr)}
 .summary.last{margin-bottom:12px}
@@ -875,18 +877,35 @@ const mkTT = id => ttDue().filter(x=>!x.unk && x.mk && x.cid===id);
 const mkRule = mark => { const r=TT_RULE[mark]; return r&&r[1] ? `「${r[1].join("」か「")}」の履歴` : "履歴（どの種類でも）"; };
 // 書き込み：キーがあればキーで、無ければ「name:氏名」で送る（名寄せ・「どの会社？」と同じ）。成功したら読み直す
 async function mkCall(fn, o, okMsg){ const key=ttKeyOr(); if(!key) return null; try{ const r=await call(fn, key, o); if(okMsg) toast(okMsg); await load(true); return r||true; }catch(err){ toast("保存に失敗: "+(err.message||err)); return null; } }
+// 見込み客の一覧の検索と並べ替え（並べ替えはこの端末が覚える）
+const MK_SORTS = [["name","名前順"],["recent","最近の履歴順"],["old","ご無沙汰順"],["new","登録が新しい順"],["tt","履歴まだを先に"]];
+const mkUi = { q:"", sort:(()=>{ try{ const v=localStorage.getItem("linola.mksort"); return MK_SORTS.some(x=>x[0]===v)? v : "name"; }catch(e){ return "name"; } })() };
+function mkDraw(open){
+  const nk=s=>String(s||"").toLowerCase().split(" ").join("").split("　").join(""); const q=nk(mkUi.q);
+  const rows=open.map(p=>{ const l=lastLog(x=>x.cid===p.id); return {p, l, d:l? String(l.date||"") : "", n:mkTT(p.id).length}; }).filter(r=>!q || nk([r.p.name,r.p.pref,r.p.city,r.p.contact,r.p.memo].join(" ")).includes(q));
+  const byName=(a,b)=>String(a.p.name).localeCompare(String(b.p.name),"ja");
+  const S2={ name:byName, recent:(a,b)=>(b.d.localeCompare(a.d))||byName(a,b), old:(a,b)=>((a.d||"0").localeCompare(b.d||"0"))||byName(a,b), new:(a,b)=>String(b.p.at||"").localeCompare(String(a.p.at||""))||byName(a,b), tt:(a,b)=>(b.n-a.n)||byName(a,b) };
+  rows.sort(S2[mkUi.sort]||byName);
+  $("#mkCnt").textContent = q ? `見込み中 ${open.length}社のうち ${rows.length}社` : `見込み中 ${open.length}社`;
+  const box=$("#mkList"); box.innerHTML = rows.map(({p,l,n})=>`<button class="row" data-go="#/m/${encodeURIComponent(p.id)}"><div class="body"><div class="t"><span class="nm">${esc(p.name)}</span>${followPill(p.follow)}${n?`<span class="pill tt">履歴まだ ${n}</span>`:""}</div><div class="s">${esc([p.pref,p.city].filter(Boolean).join(" ")||"（住所なし）")}${l?" · 最後の履歴 "+esc(l.date):" · 履歴なし"}</div></div><div class="n">›</div></button>`).join("") || (open.length? `<div class="empty">当てはまる見込み客はありません</div>` : `<div class="empty">見込み中の会社はありません。右下の「＋ 見込み客を追加」から登録できます</div>`);
+  box.querySelectorAll("[data-go]").forEach(b=>b.addEventListener("click", ()=>go(b.dataset.go)));
+}
 function viewMikomiList(){
   $("#title").innerHTML=`<span class="brand">内定前の会社</span>見込み客`;
   const open=mkOpen(), off=mkAll().filter(p=>p.state==="見送り"), done=mkAll().filter(p=>p.state==="契約");
   const one=s=>String(s||"").split(" ").filter(Boolean).join(" ");
   $("#main").innerHTML=`
     <div class="banner info">まだ契約していない会社（内定前）の一覧です。訪問・電話・面談などの履歴を入れられます。受入企業数などの数には入れていません。契約して、Linolaの表に同じ名前の会社が出ると、自動でその会社につながり、履歴も引き継ぎます。</div>
-    <div class="cnt" id="mkCnt">見込み中 ${open.length}社</div>
-    <div class="list" id="mkList">${open.map(p=>{ const l=lastLog(x=>x.cid===p.id), n=mkTT(p.id).length; return `<button class="row" data-go="#/m/${encodeURIComponent(p.id)}"><div class="body"><div class="t"><span class="nm">${esc(p.name)}</span>${followPill(p.follow)}${n?`<span class="pill tt">履歴まだ ${n}</span>`:""}</div><div class="s">${esc([p.pref,p.city].filter(Boolean).join(" ")||"（住所なし）")}${l?" · 最後の履歴 "+esc(l.date):" · 履歴なし"}</div></div><div class="n">›</div></button>`; }).join("") || `<div class="empty">見込み中の会社はありません。右下の「＋ 見込み客を追加」から登録できます</div>`}</div>
+    <div class="search"><input id="mkq" type="search" placeholder="会社名・地域・担当者・メモで検索" value="${esc(mkUi.q)}" autocomplete="off"></div>
+    <div class="chips" id="mkSort">${MK_SORTS.map(([k,l])=>`<button class="mkchip ${mkUi.sort===k?"on":""}" type="button" data-mks="${k}">${l}</button>`).join("")}</div>
+    <div class="cnt" id="mkCnt"></div>
+    <div class="list" id="mkList"></div>
     ${off.length?`<section class="sec" id="mkOffSec"><div class="sec-h"><h2>見送りにした会社 (${off.length})</h2></div><div class="card">${off.map(p=>`<div class="lrow"><span class="nm wrap">${esc(p.name)}<br><span class="lk">${esc(p.upBy||"")} ${esc(String(p.upAt||"").slice(0,10))}</span></span><button class="btn" type="button" data-go="#/m/${encodeURIComponent(p.id)}">見る</button><button class="del" type="button" data-mkback="${esc(p.id)}">元に戻す</button></div>`).join("")}</div></section>`:""}
     ${done.length?`<section class="sec" id="mkDoneSec"><div class="sec-h"><h2>契約して会社につないだ (${done.length})</h2></div><div class="card">${done.map(p=>`<div class="lrow"><span class="nm wrap">${esc(p.name)} → ${esc(one((S.companies[p.to]||{}).name))}<br><span class="lk">${esc(p.upBy||"")} ${esc(String(p.upAt||"").slice(0,10))}</span></span><button class="btn" type="button" data-go="#/c/${encodeURIComponent(p.to)}">会社を開く</button><button class="del" type="button" data-mkun="${esc(p.id)}">つなぎを外す</button></div>`).join("")}</div></section>`:""}
     <button class="fab" data-go="#/newmk">＋ 見込み客を追加</button>`;
-  wire();
+  wire(); mkDraw(open);
+  $("#mkq").addEventListener("input", e=>{ mkUi.q=e.target.value; mkDraw(open); });
+  document.querySelectorAll("[data-mks]").forEach(b=>b.addEventListener("click", ()=>{ mkUi.sort=b.dataset.mks; try{ localStorage.setItem("linola.mksort", mkUi.sort); }catch(e){} document.querySelectorAll("[data-mks]").forEach(x=>x.classList.toggle("on", x===b)); mkDraw(open); }));
   document.querySelectorAll("[data-mkback]").forEach(b=>b.addEventListener("click", async ()=>{ b.disabled=true; if(!await mkCall("mikomiState", {id:b.dataset.mkback, state:""}, "見込み中に戻しました")) b.disabled=false; }));
   document.querySelectorAll("[data-mkun]").forEach(b=>b.addEventListener("click", async ()=>{ const p=S.mikomi[b.dataset.mkun]; if(!confirm(`「${p.name}」と会社のつなぎを外しますか？（履歴は見込み客のほうに戻ります。このあと自動ではつながりません）`)) return; b.disabled=true; if(!await mkCall("mikomiState", {id:p.id, state:""}, "つなぎを外しました")) b.disabled=false; }));
 }
