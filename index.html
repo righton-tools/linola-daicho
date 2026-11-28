@@ -120,7 +120,20 @@ a{color:var(--accent);text-decoration:none}
 .tabs button{position:relative}
 #newsBdg{position:absolute;top:-6px;right:-4px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--crit);color:#fff;font-size:11px;font-weight:700;line-height:18px;text-align:center}
 .search{display:flex;gap:8px;margin-bottom:10px}
-.search input{flex:1;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:10px 12px;font-size:16px}
+.search input{flex:1;border:2px solid var(--accent);background:var(--accent-soft) url(data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20viewBox=%270%200%2024%2024%27%20fill=%27none%27%20stroke=%27%233A93AB%27%20stroke-width=%272.4%27%20stroke-linecap=%27round%27%3E%3Ccircle%20cx=%2710.5%27%20cy=%2710.5%27%20r=%276.5%27/%3E%3Cpath%20d=%27M15.5%2015.5L21%2021%27/%3E%3C/svg%3E) no-repeat 13px center/19px;border-radius:999px;padding:11px 16px 11px 42px;font-size:16px;color:var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.10);-webkit-appearance:none;appearance:none}
+.search input::placeholder{color:var(--muted);opacity:1}
+.search input:focus{outline:none;background-color:var(--surface);box-shadow:0 0 0 4px var(--accent-soft)}
+.gbar{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;align-items:center}
+.grp{touch-action:manipulation;border:1px solid var(--line);background:var(--surface2);border-radius:10px;padding:7px 11px;font-size:13px;font-weight:700;color:var(--ink2);cursor:pointer;font-family:inherit;white-space:nowrap}
+.grp i{font-style:normal;font-size:10px;margin-left:4px;opacity:.7}
+.grp.on{border-color:var(--accent);color:var(--accent)}
+.grp.open{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.gpanel{display:flex;flex-wrap:wrap;gap:6px;padding:10px;margin:0 0 8px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+.gpanel[hidden]{display:none}
+.gpanel .gh{flex-basis:100%;font-size:11.5px;color:var(--muted)}
+.gsel{font-size:12px;color:var(--muted);padding:0 0 6px}
+.gsel:empty{display:none}
+.gpanel .chip.on.pref{background:var(--ok);border-color:var(--ok)}
 .chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:8px;-webkit-overflow-scrolling:touch}
 .chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 12px;font-size:12.5px;white-space:nowrap;cursor:pointer;color:var(--ink2)}
 .chip.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
@@ -464,12 +477,10 @@ function viewHome(){
     </div>
     ${mkGo()}
     <div class="search"><input id="q" type="search" placeholder="${filt.mode==="w"?"外国人名・フリガナ・企業名で検索":"企業名・店舗・外国人名で検索"}" value="${esc(filt.q)}" autocomplete="off"></div>
-    <div class="chips">
-      <button class="chip ${!filt.flags.length&&!filt.prefs.length?"on":""}" data-clear="1">すべて</button>
-      ${[["entry","入国フォロー"+(entryList().length?` ${entryList().length}`:"")],["follow","対応中"+(nFollow?` ${nFollow}`:"")],["due","対応期限7日以内"+(nDue?` ${nDue}`:"")],["active","在職者あり"],["work","在職"],["pre",filt.mode==="w"?"入国前":"入国前あり"],["expired","期限切れ"],["warn","90日以内"],["warn30","30日以内"],["apply","申請中"],["pending","退職予定"],["retired",filt.mode==="w"?"退職":"退職者あり"],["mine","メインが自分"],["nomain","メイン未設定"]].filter(([k])=>HOME_FLAGS[filt.mode==="w"?"w":"c"].includes(k)).sort((a,b)=>{ const o=HOME_FLAGS[filt.mode==="w"?"w":"c"]; return o.indexOf(a[0])-o.indexOf(b[0]); }).map(([k,l])=>`<button class="chip ${filt.flags.includes(k)?"on":""}" data-flag="${k}">${l}</button>`).join("")}
-      ${prefs.map(p=>`<button class="chip pref ${filt.prefs.includes(p)?"on":""}" data-pref="${esc(p)}">${esc(p)}</button>`).join("")}
-    </div>
-    <div class="empty" style="font-size:11.5px;padding:0 0 6px">絞り込みは複数選べます（都道府県${filt.mode==="w"?"と「在職・入国前・退職」":""}は「どれか」、他は「すべて満たす」）</div>
+    ${(()=>{ const FL=[["entry","入国フォロー"+(entryList().length?` ${entryList().length}`:"")],["follow","対応中"+(nFollow?` ${nFollow}`:"")],["due","対応期限7日以内"+(nDue?` ${nDue}`:"")],["active","在職者あり"],["work","在職"],["pre",filt.mode==="w"?"入国前":"入国前あり"],["expired","期限切れ"],["warn","90日以内"],["warn30","30日以内"],["apply","申請中"],["pending","退職予定"],["retired",filt.mode==="w"?"退職":"退職者あり"],["mine","メインが自分"],["nomain","メイン未設定"]].filter(([k])=>HOME_FLAGS[filt.mode==="w"?"w":"c"].includes(k)).sort((a,b)=>{ const o=HOME_FLAGS[filt.mode==="w"?"w":"c"]; return o.indexOf(a[0])-o.indexOf(b[0]); });
+      const chip=([k,l])=>`<button class="chip ${filt.flags.includes(k)?"on":""}" data-flag="${k}">${l}</button>`; const pick=ks=>FL.filter(x=>ks.includes(x[0])).map(chip).join("");
+      const GR=[["g1","対応",pick(["entry","follow","due"]),"選んだものを「すべて満たす」"],["g2","在留期限",pick(["expired","warn30","warn","apply"]),"選んだものを「すべて満たす」"],["g3","在職・退職",pick(["active","work","pre","pending","retired"]),filt.mode==="w"?"「在職・入国前・退職」は、選んだものの「どれか」":"選んだものを「すべて満たす」"],["g4","担当",pick(["mine","nomain"]),"選んだものを「すべて満たす」"],["g5","地域",prefs.map(p=>`<button class="chip pref ${filt.prefs.includes(p)?"on":""}" data-pref="${esc(p)}">${esc(p)}</button>`).join(""),"選んだ都道府県の「どれか」"]].filter(g=>g[2]);
+      return `<div class="gbar" id="gbar"><button class="chip ${!filt.flags.length&&!filt.prefs.length?"on":""}" data-clear="1">すべて</button>${GR.map(g=>`<button type="button" class="grp" data-grp="${g[0]}">${g[1]}<b></b><i>▾</i></button>`).join("")}</div>${GR.map(g=>`<div class="gpanel" data-gp="${g[0]}" hidden>${g[2]}<div class="gh">複数選べます（${g[3]}）</div></div>`).join("")}<div class="gsel" id="gsel"></div>`; })()}
     <div class="rbar"><div class="cnt" id="cnt"></div><div class="hmode"><button type="button" data-mode="c" class="${filt.mode!=="w"?"on":""}">企業別</button><button type="button" data-mode="w" class="${filt.mode==="w"?"on":""}">個人別</button></div></div>
     <div class="list" id="list"></div>
     <div class="empty" style="font-size:12px">参照元の更新: ${esc(S.refreshedAt)}${S.fromCache?"（端末保存のデータ・更新中）":""} · <a href="#" id="reload">最新を読み込む</a> · <a href="#/fix">名寄せ・ズレ確認</a></div>
@@ -484,7 +495,16 @@ function viewHome(){
   $("#reload").addEventListener("click", async e=>{ e.preventDefault(); toast("参照元を再読み込み中…"); try{ await call("refreshReference"); }catch(_){} load(true); });
   wire();
 }
-function homeList(){
+// ホームの絞り込み：グループのボタンを押すと、その中の選択肢がひらく。選んだ数はボタンに出る
+let homeGrp="";
+function homeGrpSync(){
+  const on=c=>c.dataset.flag? filt.flags.includes(c.dataset.flag) : filt.prefs.includes(c.dataset.pref); const sel=[];
+  document.querySelectorAll("[data-gp]").forEach(p=>{ const id=p.dataset.gp; p.hidden = id!==homeGrp; const hit=[...p.querySelectorAll(".chip")].filter(on); hit.forEach(c=>sel.push(c.textContent));
+    const b=document.querySelector(`[data-grp="${id}"]`); if(b){ b.querySelector("b").textContent = hit.length? " "+hit.length : ""; b.classList.toggle("on", hit.length>0); b.classList.toggle("open", id===homeGrp); } });
+  const g=document.getElementById("gsel"); if(g) g.textContent = sel.length? "選択中："+sel.join("・") : "";
+}
+document.addEventListener("click", e=>{ const b=e.target.closest && e.target.closest("[data-grp]"); if(!b) return; homeGrp = homeGrp===b.dataset.grp? "" : b.dataset.grp; homeGrpSync(); });
+function homeList(){ homeGrpSync();
   const el=$("#list"); if(!el) return;
   if(filt.mode==="w") return homeListW(el);
   const all = Object.values(S.companies).sort((a,b)=>a.name.localeCompare(b.name,"ja"));
